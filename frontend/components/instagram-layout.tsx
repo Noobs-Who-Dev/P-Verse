@@ -1,0 +1,88 @@
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { Sidebar } from "@/components/sidebar"
+import { Feed } from "@/components/feed"
+import { FriendDropdown } from "@/components/friend-dropdown"
+import { RightSidebar } from "@/components/right-sidebar"
+import { MessengerPopup } from "@/components/messenger-popup"
+import { SearchPanel } from "@/components/search-panel"
+import { NotificationsPanel } from "@/components/notifications-panel"
+import { CreatePostModal } from "@/components/create-post-modal"
+
+export function InstagramLayout() {
+  const router = useRouter()
+  const [selectedFriend, setSelectedFriend] = useState<string>("All")
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [activePanel, setActivePanel] = useState<"search" | "notifications" | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [messengerOpen, setMessengerOpen] = useState(false)
+
+  const handleNavClick = (item: string) => {
+    if (item === "Search") {
+      setSidebarCollapsed(true)
+      setActivePanel("search")
+    } else if (item === "Notifications") {
+      setSidebarCollapsed(true)
+      setActivePanel("notifications")
+    } else if (item === "Create") {
+      setShowCreateModal(true)
+    } else if (item === "Messages") {
+      router.push("/messages")
+    } else {
+      setSidebarCollapsed(false)
+      setActivePanel(null)
+    }
+  }
+
+  const handleClosePanel = () => {
+    setSidebarCollapsed(false)
+    setActivePanel(null)
+  }
+
+  const handleOpenFullMessenger = (username?: string) => {
+    if (username) {
+      router.push(`/messages?user=${username}`)
+    } else {
+      router.push("/messages")
+    }
+    setMessengerOpen(false)
+  }
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="flex">
+        <Sidebar collapsed={sidebarCollapsed} onNavClick={handleNavClick} />
+
+        {activePanel === "search" && <SearchPanel onClose={handleClosePanel} />}
+        {activePanel === "notifications" && <NotificationsPanel onClose={handleClosePanel} />}
+
+        <main
+          className={`flex-1 px-1 py-0 ${sidebarCollapsed ? "ml-[73px]" : "ml-[245px]"} xl:mr-[320px] transition-all duration-300`}
+        >
+          <div className="max-w-[630px] mx-auto px-4 py-8">
+            <FriendDropdown selectedFriend={selectedFriend} onSelectFriend={setSelectedFriend} />
+            <Feed selectedFriend={selectedFriend} />
+          </div>
+        </main>
+
+        <RightSidebar />
+      </div>
+
+      <MessengerPopup
+        isOpen={messengerOpen}
+        onToggle={() => setMessengerOpen(!messengerOpen)}
+        onOpenFullMessenger={handleOpenFullMessenger}
+      />
+
+      {showCreateModal && (
+        <CreatePostModal
+          onClose={() => setShowCreateModal(false)}
+          selectedFriend={selectedFriend}
+          onSelectFriend={setSelectedFriend}
+        />
+      )}
+    </div>
+  )
+}
