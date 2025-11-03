@@ -5,7 +5,7 @@
 
 **Phạm vi**: Ứng dụng mạng xã hội LOCAL, tập trung vào tính năng CORE, phù hợp cho dự án bài tập lớn 4 sinh viên.
 
-**Công nghệ**: Java 17 + Spring Boot + React.js + JPA (MySQL) + WebSocket (SockJS, STOMP)
+**Công nghệ**: Java 21 + Spring Boot + React.js + JPA (MySQL) + WebSocket (SockJS, STOMP)
 
 ---
 
