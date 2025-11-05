@@ -16,8 +16,7 @@
 - ✅ **Moments/Posts**: Chia sẻ screenshot với caption
 - ✅ **Social Network**: Kết bạn, xem feed bạn bè
 - ✅ **Reactions**: Like/Love/Haha... trên moments
-- ✅ **Comments**: Bình luận trên moments
-- ✅ **Messaging**: Chat 1-1 cơ bản
+- ✅ **Messaging**: Chat 1-1 cơ bản + moment_reply
 
 ### 2. Tính Năng Nice to Have (KHÔNG CẦN DATABASE)
 - **Smart Context**: Tự động nhận diện app đang dùng (logic frontend/service layer)
@@ -44,15 +43,17 @@
 
 #### 1. **users** (Bảng người dùng - ĐƠN GIẢN)
 ```sql
+-- ✅ Đã có trong users table
 CREATE TABLE users (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,  -- BCrypt
+    password VARCHAR(255) NOT NULL, -- Bcrypt
     display_name VARCHAR(100),
+    phone_number VARCHAR(20),
     avatar_url VARCHAR(255),
     bio TEXT,
-    is_online TINYINT(1) DEFAULT 0,  -- MySQL: 0=false, 1=true
+    is_online TINYINT(1) DEFAULT 0,
     last_seen_at DATETIME DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -60,10 +61,6 @@ CREATE TABLE users (
     INDEX idx_username (username),
     INDEX idx_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Ví dụ data:
-INSERT INTO users (username, email, password, display_name) 
-VALUES ('jbledgt', 'john@example.com', '$2a$10$...', 'Hoàng Nguyễn');
 ```
 
 #### 2. **user_settings** (Cài đặt người dùng - Optional cho MVP)
@@ -71,14 +68,22 @@ VALUES ('jbledgt', 'john@example.com', '$2a$10$...', 'Hoàng Nguyễn');
 CREATE TABLE user_settings (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT NOT NULL UNIQUE,
-    theme VARCHAR(20) DEFAULT 'dark',
-    language VARCHAR(10) DEFAULT 'vi',
-    moment_visibility VARCHAR(20) DEFAULT 'all_friends',
+    
+    -- ✅ CORE settings (MVP Phase 1 - 3 fields)
+    theme VARCHAR(20) DEFAULT 'dark' 
+        CHECK (theme IN ('dark', 'light', 'auto')),
+    language VARCHAR(10) DEFAULT 'vi' 
+        CHECK (language IN ('vi', 'en')),
     notifications_enabled TINYINT(1) DEFAULT 1,
+    
+    -- ⚠️ FUTURE settings (Phase 2+)
+    extended_settings JSON DEFAULT NULL,
+    
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
@@ -90,24 +95,27 @@ CREATE TABLE user_settings (
 ```sql
 CREATE TABLE friendships (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
-    friend_id BIGINT NOT NULL,
-    status VARCHAR(20) DEFAULT 'pending',  -- pending, accepted, rejected
+    user_id BIGINT NOT NULL,      -- Luôn là user ID nhỏ hơn
+    friend_id BIGINT NOT NULL,    -- Luôn là user ID lớn hơn
+    status VARCHAR(20) DEFAULT 'pending',
+    requester_id BIGINT NOT NULL, -- ← MỚI: Ai là người gửi request
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
     
     UNIQUE KEY idx_friendship_pair (user_id, friend_id),
     INDEX idx_user_status (user_id, status),
     INDEX idx_friend_status (friend_id, status),
     
-    -- Đảm bảo không tự kết bạn với chính mình
-    CONSTRAINT chk_no_self_friend CHECK (user_id != friend_id)
+    -- ✅ Enforce user_id luôn nhỏ hơn friend_id
+    CONSTRAINT chk_user_order CHECK (user_id < friend_id),
+    CONSTRAINT chk_no_self_friend CHECK (user_id != friend_id),
+    -- ✅ requester_id phải là 1 trong 2 người
+    CONSTRAINT chk_requester CHECK (requester_id IN (user_id, friend_id))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Note: Quan hệ 2 chiều - cần insert 2 records hoặc handle trong application
 ```
 
 #### 4. **blocked_users** (Chặn người dùng - Optional cho MVP)
@@ -132,14 +140,14 @@ CREATE TABLE blocked_users (
 
 #### 5. **moments** (Khoảnh khắc/Posts)
 ```sql
+-- Bảng moments (simplified - không có context)
 CREATE TABLE moments (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT NOT NULL,
     caption TEXT,
-    image_path VARCHAR(255) NOT NULL,  -- Local file path
-    context_type VARCHAR(50) NULL,  -- music, game, work, browser, other
-    context_details VARCHAR(255),  -- "Spotify - Blinding Lights", "League of Legends"
-    visibility VARCHAR(20) DEFAULT 'all_friends',  -- all_friends, private
+    image_path VARCHAR(255) NOT NULL,
+    visibility VARCHAR(20) DEFAULT 'all_friends'
+        CHECK (visibility IN ('all_friends', 'close_friends', 'private')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -147,11 +155,32 @@ CREATE TABLE moments (
     INDEX idx_user_created (user_id, created_at DESC),
     INDEX idx_created_at (created_at DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
 
--- Ví dụ:
-INSERT INTO moments (user_id, caption, image_path, context_type, context_details) 
-VALUES (1, 'Chill evening 🎵', '/uploads/moments/user1_20231018_123456.png', 
-        'music', 'Spotify - Blinding Lights - The Weeknd');
+```sql
+-- Bảng moment_contexts (reserved for future feature)
+CREATE TABLE moment_contexts (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    moment_id BIGINT NOT NULL UNIQUE,
+    context_type VARCHAR(50) NULL 
+        CHECK (context_type IN ('music', 'game', 'work', 'browser', 'other')),
+    context_details VARCHAR(255) NULL,
+    app_name VARCHAR(100),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (moment_id) REFERENCES moments(id) ON DELETE CASCADE,
+    
+    INDEX idx_context_type (context_type),
+    
+    CONSTRAINT chk_context_consistency 
+        CHECK (
+            (context_type IS NULL AND context_details IS NULL) OR
+            (context_type IS NOT NULL AND context_details IS NOT NULL)
+        )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Note: Bảng này chưa được sử dụng trong MVP
+-- Dành cho tính năng "Activity Context Detection" ở phiên bản sau
 ```
 
 #### 6. **moment_reactions** (Reactions)
@@ -160,33 +189,19 @@ CREATE TABLE moment_reactions (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     moment_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
-    reaction_type VARCHAR(20) NOT NULL,  -- like, love, haha, wow, sad, angry
+    reaction_type VARCHAR(20) NOT NULL 
+        CHECK (reaction_type IN ('like', 'love', 'haha', 'wow', 'sad', 'angry')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (moment_id) REFERENCES moments(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     
-    -- Mỗi user chỉ react 1 lần trên 1 moment
     UNIQUE KEY idx_moment_user_reaction (moment_id, user_id),
     INDEX idx_moment_reactions (moment_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-#### 7. **moment_comments** (Bình luận)
-```sql
-CREATE TABLE moment_comments (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    moment_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
-    content TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (moment_id) REFERENCES moments(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    
-    INDEX idx_moment_comments (moment_id, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-```
+#### 7. **moment_comments** (bỏ)
 
 ---
 
@@ -210,6 +225,19 @@ CREATE TABLE conversations (
     
     CONSTRAINT chk_user_order CHECK (user1_id < user2_id)  -- user1_id luôn nhỏ hơn để tránh duplicate
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- thêm trigger
+DELIMITER $$
+CREATE TRIGGER update_conversation_timestamp
+AFTER INSERT ON messages
+FOR EACH ROW
+BEGIN
+    -- NEW = record message vừa được insert
+    UPDATE conversations 
+    SET last_message_at = NEW.created_at 
+    WHERE id = NEW.conversation_id;
+END$$
+DELIMITER ;
 ```
 
 #### 9. **messages** (Tin nhắn)
@@ -218,19 +246,31 @@ CREATE TABLE messages (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     conversation_id BIGINT NOT NULL,
     sender_id BIGINT NOT NULL,
-    message_type VARCHAR(20) DEFAULT 'text',  -- text, image, moment_share
+    
+    message_type VARCHAR(20) DEFAULT 'text' 
+        CHECK (message_type IN ('text', 'image', 'moment_reply')),
+    
     content TEXT,
     image_path VARCHAR(255) NULL,
-    shared_moment_id BIGINT NULL,
+    replied_moment_id BIGINT NULL,
+    
     is_read TINYINT(1) DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
     FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (shared_moment_id) REFERENCES moments(id) ON DELETE SET NULL,
+    FOREIGN KEY (replied_moment_id) REFERENCES moments(id) ON DELETE SET NULL,
     
     INDEX idx_conversation_messages (conversation_id, created_at DESC),
-    INDEX idx_sender_messages (sender_id, created_at DESC)
+    INDEX idx_sender_messages (sender_id, created_at DESC),
+    INDEX idx_unread (conversation_id, is_read),
+    
+    CONSTRAINT chk_text_has_content 
+        CHECK (message_type != 'text' OR (content IS NOT NULL AND CHAR_LENGTH(content) BETWEEN 1 AND 1000)),
+    CONSTRAINT chk_image_has_path 
+        CHECK (message_type != 'image' OR image_path IS NOT NULL),
+    CONSTRAINT chk_reply_has_moment 
+        CHECK (message_type != 'moment_reply' OR (replied_moment_id IS NOT NULL AND content IS NOT NULL))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
@@ -250,11 +290,11 @@ CREATE TABLE messages (
 └──────────────┘  └─────────────┘
                         │
                         │ 1:N
-                        ├──────────────┬──────────────┐
-                        ▼              ▼              ▼
-                  ┌──────────┐  ┌──────────┐  ┌──────────┐
-                  │reactions │  │comments  │  │messages  │(share)
-                  └──────────┘  └──────────┘  └──────────┘
+                        ├──────────────┬
+                        ▼              ▼    
+                  ┌──────────┐  ┌──────────┐
+                  │reactions │  │messages  │(reply)
+                  └──────────┘  └──────────┘
 
 ┌─────────────┐
 │   users     │───────┐
@@ -277,17 +317,6 @@ CREATE TABLE messages (
 │   messages   │
 └──────────────┘
 ```
-
-**Tóm tắt 9 bảng CORE:**
-1. users - Người dùng
-2. user_settings - Cài đặt người dùng
-3. friendships - Quan hệ bạn bè
-4. blocked_users - Chặn người dùng
-5. moments - Khoảnh khắc/Posts
-6. moment_reactions - Phản ứng
-7. moment_comments - Bình luận
-8. conversations - Cuộc trò chuyện
-9. messages - Tin nhắn
 
 ---
 
