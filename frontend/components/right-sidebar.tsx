@@ -100,7 +100,7 @@ export function RightSidebar() {
               </span>
             ))}
           </div>
-          <p className="text-xs text-[#737373]">© 2025 INSTAGRAM FROM META</p>
+          <p className="text-xs text-[#737373]">© 2025 P-VERSE FROM NOOBS-WHO-DEV</p>
         </div>
       </div>
     </aside>

@@ -7,6 +7,7 @@ import { MessengerPopup } from "@/components/messenger-popup"
 import { SearchPanel } from "@/components/search-panel"
 import { NotificationsPanel } from "@/components/notifications-panel"
 import { CreatePostModal } from "@/components/create-post-modal"
+import { PostDetailModal } from "@/components/post-detail-modal"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Settings, Grid3x3, Bookmark } from "lucide-react"
@@ -26,6 +27,7 @@ export default function ProfilePage() {
   const [activePanel, setActivePanel] = useState<"search" | "notifications" | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedFriend, setSelectedFriend] = useState<string>("All")
+  const [selectedPost, setSelectedPost] = useState<(typeof userPosts)[0] | null>(null)
 
   const handleNavClick = (item: string) => {
     if (item === "Home") {
@@ -154,7 +156,11 @@ export default function ProfilePage() {
               {activeTab === "posts" && (
                 <div className="grid grid-cols-3 gap-1">
                   {userPosts.map((post) => (
-                    <div key={post.id} className="aspect-square relative group cursor-pointer">
+                    <div
+                      key={post.id}
+                      className="aspect-square relative group cursor-pointer"
+                      onClick={() => setSelectedPost(post)}
+                    >
                       <Image
                         src={post.image || "/placeholder.svg"}
                         alt="Post"
@@ -199,6 +205,8 @@ export default function ProfilePage() {
           onSelectFriend={setSelectedFriend}
         />
       )}
+
+      {selectedPost && <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} />}
     </div>
   )
 }

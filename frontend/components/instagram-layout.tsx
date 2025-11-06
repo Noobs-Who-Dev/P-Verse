@@ -61,9 +61,15 @@ export function InstagramLayout() {
         <main
           className={`flex-1 px-1 py-0 ${sidebarCollapsed ? "ml-[73px]" : "ml-[245px]"} xl:mr-[320px] transition-all duration-300`}
         >
-          <div className="max-w-[630px] mx-auto px-4 py-8">
-            <FriendDropdown selectedFriend={selectedFriend} onSelectFriend={setSelectedFriend} />
-            <Feed selectedFriend={selectedFriend} />
+          <div className="relative">
+            <div className="sticky top-8 z-40 flex justify-center pointer-events-none">
+              <div className="pointer-events-auto">
+                <FriendDropdown selectedFriend={selectedFriend} onSelectFriend={setSelectedFriend} />
+              </div>
+            </div>
+            <div className="max-w-[630px] mx-auto px-4 pt-20">
+              <Feed selectedFriend={selectedFriend} />
+            </div>
           </div>
         </main>
 
