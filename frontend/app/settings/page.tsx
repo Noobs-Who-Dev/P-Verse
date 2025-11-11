@@ -10,6 +10,7 @@ import { NotificationsPanel } from "@/components/notifications-panel"
 import { CreatePostModal } from "@/components/create-post-modal"
 import { FriendsListDetail } from "@/components/settings/friends-list-detail"
 import { FriendRequestsDetail } from "@/components/settings/friend-requests-detail"
+import { SentRequestsDetail } from "@/components/settings/sent-requests-detail"
 import {
   User,
   Users,
@@ -189,11 +190,23 @@ export default function SettingsPage() {
     if (item === "Home") {
       router.push("/")
     } else if (item === "Search") {
-      setSidebarCollapsed(true)
-      setActivePanel("search")
+      // Toggle: if already open, close it; if closed, open it
+      if (activePanel === "search") {
+        setSidebarCollapsed(false)
+        setActivePanel(null)
+      } else {
+        setSidebarCollapsed(true)
+        setActivePanel("search")
+      }
     } else if (item === "Notifications") {
-      setSidebarCollapsed(true)
-      setActivePanel("notifications")
+      // Toggle: if already open, close it; if closed, open it
+      if (activePanel === "notifications") {
+        setSidebarCollapsed(false)
+        setActivePanel(null)
+      } else {
+        setSidebarCollapsed(true)
+        setActivePanel("notifications")
+      }
     } else if (item === "Create") {
       setShowCreateModal(true)
     } else if (item === "Messages") {
@@ -491,6 +504,17 @@ export default function SettingsPage() {
             <div className="flex-1 text-left">
               <h4 className="text-base font-medium mb-1">Pending Friend Requests</h4>
               <p className="text-sm text-muted-foreground">View and manage incoming friend requests.</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
+          </button>
+
+          <button
+            onClick={() => setDetailView("sent-requests")}
+            className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-muted transition-colors border border-border"
+          >
+            <div className="flex-1 text-left">
+              <h4 className="text-base font-medium mb-1">Sent Friend Requests</h4>
+              <p className="text-sm text-muted-foreground">View and manage your outgoing friend requests.</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
           </button>
@@ -1122,6 +1146,9 @@ export default function SettingsPage() {
     if (detailView === "friend-requests") {
       return <FriendRequestsDetail onBack={() => setDetailView(null)} />
     }
+    if (detailView === "sent-requests") {
+      return <SentRequestsDetail onBack={() => setDetailView(null)} />
+    }
     if (detailView === "blocked-users") {
       return renderBlockedUsersDetail()
     }
@@ -1183,13 +1210,6 @@ export default function SettingsPage() {
         {activePanel === "search" && <SearchPanel onClose={handleClosePanel} />}
         {activePanel === "notifications" && <NotificationsPanel onClose={handleClosePanel} />}
 
-        {activePanel && (
-          <div
-            className="fixed inset-0 bg-black/20 z-30"
-            style={{ marginLeft: sidebarCollapsed ? "73px" : "245px" }}
-            onClick={handleClosePanel}
-          />
-        )}
 
         <main className={`flex-1 ${sidebarCollapsed ? "ml-[73px]" : "ml-[245px]"} transition-all duration-300`}>
           <div className="flex h-screen">

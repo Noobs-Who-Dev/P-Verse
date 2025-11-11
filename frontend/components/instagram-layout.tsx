@@ -21,11 +21,23 @@ export function InstagramLayout() {
 
   const handleNavClick = (item: string) => {
     if (item === "Search") {
-      setSidebarCollapsed(true)
-      setActivePanel("search")
+      // Toggle: if already open, close it; if closed, open it
+      if (activePanel === "search") {
+        setSidebarCollapsed(false)
+        setActivePanel(null)
+      } else {
+        setSidebarCollapsed(true)
+        setActivePanel("search")
+      }
     } else if (item === "Notifications") {
-      setSidebarCollapsed(true)
-      setActivePanel("notifications")
+      // Toggle: if already open, close it; if closed, open it
+      if (activePanel === "notifications") {
+        setSidebarCollapsed(false)
+        setActivePanel(null)
+      } else {
+        setSidebarCollapsed(true)
+        setActivePanel("notifications")
+      }
     } else if (item === "Create") {
       setShowCreateModal(true)
     } else if (item === "Messages") {
@@ -57,6 +69,7 @@ export function InstagramLayout() {
 
         {activePanel === "search" && <SearchPanel onClose={handleClosePanel} />}
         {activePanel === "notifications" && <NotificationsPanel onClose={handleClosePanel} />}
+
 
         <main
           className={`flex-1 px-1 py-0 ${sidebarCollapsed ? "ml-[73px]" : "ml-[245px]"} xl:mr-[320px] transition-all duration-300`}
