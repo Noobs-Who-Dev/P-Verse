@@ -41,6 +41,16 @@ public class UserSettingsService {
         return toDto(settingsRepository.save(settings));
     }
 
+    public UserSettingsDto toggleNotifications(Long userId) {
+        UserSettings settings = settingsRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Settings không tồn tại"));
+
+        // Toggle notification status
+        settings.setNotificationsEnabled(!settings.getNotificationsEnabled());
+
+        return toDto(settingsRepository.save(settings));
+    }
+
     private UserSettingsDto toDto(UserSettings settings) {
         return UserSettingsDto.builder()
                 .id(settings.getId())

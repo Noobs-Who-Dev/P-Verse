@@ -38,7 +38,7 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
   const [searchResults, setSearchResults] = useState<(typeof allUsers)[0][]>([])
   const [hasSearched, setHasSearched] = useState(false)
   const [friendStates, setFriendStates] = useState<Record<string, "friend" | "add" | "pending">>(
-    Object.fromEntries(allUsers.map((user) => [user.username, user.status])),
+    Object.fromEntries(allUsers.map((user) => [user.username, user.status as "friend" | "add" | "pending"])),
   )
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {

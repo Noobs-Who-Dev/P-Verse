@@ -99,12 +99,6 @@ export default function SettingsPage() {
   const [phoneRevealed, setPhoneRevealed] = useState(false)
   const [language, setLanguage] = useState("en")
 
-  // Local theme state to avoid bounce-back from next-themes async update
-  const [localTheme, setLocalTheme] = useState<string>("")
-
-  // Ref to track if user is actively toggling theme (prevent race condition)
-  const isTogglingTheme = useRef(false);
-
   // Ref to track if component has mounted and settings loaded
   const hasLoadedSettings = useRef(false);
 
@@ -261,7 +255,6 @@ export default function SettingsPage() {
         // Sync backend data với UI state
         const themeValue = data.theme?.toLowerCase() || 'light';
         setTheme(themeValue);
-        setLocalTheme(themeValue);
 
         if (data.language === 'VI') setLanguage('vi');
         if (data.language === 'EN') setLanguage('en');
@@ -292,34 +285,48 @@ export default function SettingsPage() {
   }, [userId]); // Only run on mount and when userId changes
 
 
-  // Track changes using localTheme instead of nextTheme
+  // Track changes using nextTheme
   useEffect(() => {
-    // Only track changes after initial load and when localTheme is defined
-    if (isLoading || !localTheme) return;
+    // Only track changes after initial load
+    if (isLoading) return;
 
-    const themeChanged = localTheme !== originalSettings.theme;
+    // Wait for nextTheme to be defined
+    if (!nextTheme && !originalSettings.theme) return;
+
+    // Use current theme or default
+    const currentTheme = nextTheme || originalSettings.theme || 'light';
+
+    const themeChanged = currentTheme !== originalSettings.theme;
     const languageChanged = language !== originalSettings.language;
     const notificationsChanged = notificationSettings.desktopNotifications !== originalSettings.notificationsEnabled;
 
     setHasUnsavedChanges(themeChanged || languageChanged || notificationsChanged);
-  }, [localTheme, language, notificationSettings.desktopNotifications, originalSettings, isLoading]);
+
+    console.log('[Track Changes]', {
+      currentTheme,
+      originalTheme: originalSettings.theme,
+      changed: themeChanged || languageChanged || notificationsChanged
+    });
+  }, [nextTheme, language, notificationSettings.desktopNotifications, originalSettings, isLoading]);
 
   // Save all changes
   const handleSaveChanges = async () => {
     try {
       setIsSaving(true);
 
+      const currentTheme = nextTheme || 'light';
       const settingsData = {
-        theme: localTheme.toUpperCase(),
+        theme: currentTheme.toUpperCase(),
         language: language === 'vi' ? 'VI' : 'EN',
         notificationsEnabled: notificationSettings.desktopNotifications
       };
 
+      console.log('[Save] Saving settings:', settingsData);
       await settingsService.updateSettings(userId, settingsData);
 
       // Update original settings
       setOriginalSettings({
-        theme: localTheme,
+        theme: currentTheme,
         language: language,
         notificationsEnabled: notificationSettings.desktopNotifications
       });
@@ -346,7 +353,6 @@ export default function SettingsPage() {
   const handleCancelChanges = () => {
     if (originalSettings.theme) {
       setTheme(originalSettings.theme);
-      setLocalTheme(originalSettings.theme);
     }
     setLanguage(originalSettings.language);
     setNotificationSettings(prev => ({
@@ -1021,19 +1027,13 @@ export default function SettingsPage() {
 
   const renderAppearanceSettings = () => {
     const handleThemeToggle = (checked: boolean) => {
-      console.log('[Theme Toggle] Toggling theme to:', checked ? 'dark' : 'light');
-      isTogglingTheme.current = true;
       const newTheme = checked ? "dark" : "light";
+      console.log('[Theme Toggle] Changing theme to:', newTheme);
 
-      // Update both states immediately
-      setLocalTheme(newTheme);
+      // Update theme using next-themes
       setTheme(newTheme);
 
-      // Reset flag after a short delay to allow next-themes to update
-      setTimeout(() => {
-        isTogglingTheme.current = false;
-        console.log('[Theme Toggle] Toggle complete');
-      }, 100);
+      // Changes will be saved when user clicks "Save Changes" button
     };
 
     return (
@@ -1048,7 +1048,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-3">
               <Sun className="w-5 h-5 text-muted-foreground" />
               <Switch
-                checked={localTheme === "dark"}
+                checked={nextTheme === "dark"}
                 onCheckedChange={handleThemeToggle}
               />
               <Moon className="w-5 h-5 text-muted-foreground" />

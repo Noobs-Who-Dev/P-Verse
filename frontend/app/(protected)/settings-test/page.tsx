@@ -128,10 +128,10 @@ export default function SettingsTestPage() {
   const testNotificationsAPI = async () => {
     try {
       console.log('🧪 Testing Notifications API...')
-      await settingsService.toggleNotifications(userId, notificationsEnabled)
+      await settingsService.toggleNotifications(userId)
       toast({
         title: "Notifications API Test",
-        description: "Notifications updated via PATCH endpoint",
+        description: "Notifications toggled via PUT endpoint",
       })
     } catch (error) {
       console.error('❌ Notifications API failed:', error)

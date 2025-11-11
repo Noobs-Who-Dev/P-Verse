@@ -16,6 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
@@ -50,8 +52,8 @@ public class UserController {
     @PatchMapping("/{id}/online-status")
     public ResponseEntity<Void> updateOnlineStatus(
             @PathVariable Long id,
-            @RequestParam Boolean isOnline) {
-        userService.updateOnlineStatus(id, isOnline);
+            @RequestBody Map<String, Boolean> request) {
+        userService.updateOnlineStatus(id, request.get("isOnline"));
         return ResponseEntity.ok().build();
     }
 
