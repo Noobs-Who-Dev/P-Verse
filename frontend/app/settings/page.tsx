@@ -8,6 +8,8 @@ import { MessengerPopup } from "@/components/messenger-popup"
 import { SearchPanel } from "@/components/search-panel"
 import { NotificationsPanel } from "@/components/notifications-panel"
 import { CreatePostModal } from "@/components/create-post-modal"
+import { FriendsListDetail } from "@/components/settings/friends-list-detail"
+import { FriendRequestsDetail } from "@/components/settings/friend-requests-detail"
 import {
   User,
   Users,
@@ -20,13 +22,6 @@ import {
   Info,
   ChevronRight,
   ChevronLeft,
-  Search,
-  MoreVertical,
-  UserMinus,
-  Ban,
-  MessageCircle,
-  UserCheck,
-  UserX,
   X,
   Smartphone,
   Trash2,
@@ -49,7 +44,6 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 const settingsCategories = [
   {
@@ -184,35 +178,6 @@ export default function SettingsPage() {
       lastActive: "1 day ago",
       current: false,
     },
-  ]
-
-  const mockFriends = [
-    { id: "1", username: "sarah.johnson", name: "Sarah Johnson", avatar: "/woman-profile.jpg" },
-    { id: "2", username: "mike.chen", name: "Mike Chen", avatar: "/asian-man-profile.jpg" },
-    { id: "3", username: "emma.wilson", name: "Emma Wilson", avatar: "/blonde-woman-profile.jpg" },
-    { id: "4", username: "james.brown", name: "James Brown", avatar: "/black-man-profile.jpg" },
-    { id: "5", username: "olivia.davis", name: "Olivia Davis", avatar: "/redhead-woman-profile.jpg" },
-    { id: "6", username: "alex.martinez", name: "Alex Martinez", avatar: "/latino-man-profile.jpg" },
-    { id: "7", username: "sophia.lee", name: "Sophia Lee", avatar: "/korean-woman-profile.jpg" },
-    { id: "8", username: "daniel.kim", name: "Daniel Kim", avatar: "/korean-man-profile.jpg" },
-  ]
-
-  const mockFriendRequests = [
-    {
-      id: "1",
-      username: "jessica.taylor",
-      name: "Jessica Taylor",
-      avatar: "/brunette-woman-profile.jpg",
-      mutualFriends: 5,
-    },
-    {
-      id: "2",
-      username: "ryan.anderson",
-      name: "Ryan Anderson",
-      avatar: "/bearded-man-profile.jpg",
-      mutualFriends: 3,
-    },
-    { id: "3", username: "mia.garcia", name: "Mia Garcia", avatar: "/latina-woman-profile.jpg", mutualFriends: 8 },
   ]
 
   const mockBlockedUsers = [
@@ -461,122 +426,6 @@ export default function SettingsPage() {
     )
   }
 
-  const renderFriendsListDetail = () => {
-    const filteredFriends = mockFriends.filter(
-      (friend) =>
-        friend.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        friend.name.toLowerCase().includes(searchQuery.toLowerCase()),
-    )
-
-    return (
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <button onClick={() => setDetailView(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-          <h2 className="text-2xl font-semibold">Friends List</h2>
-        </div>
-
-        {/* Search */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-secondary border-none"
-          />
-        </div>
-
-        {/* Friends List */}
-        <div className="flex-1 overflow-y-auto space-y-2">
-          {filteredFriends.map((friend) => (
-            <div
-              key={friend.id}
-              className="flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={friend.avatar || "/placeholder.svg"} alt={friend.name} />
-                  <AvatarFallback>{friend.name[0]}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-medium">{friend.username}</div>
-                  <div className="text-sm text-muted-foreground">{friend.name}</div>
-                </div>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="p-2 hover:bg-secondary rounded-full transition-colors">
-                    <MoreVertical className="w-5 h-5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-card border-border">
-                  <DropdownMenuItem className="hover:bg-muted cursor-pointer">
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    Message
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="hover:bg-muted cursor-pointer">
-                    <UserMinus className="w-4 h-4 mr-2" />
-                    Unfriend
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="text-red-500 hover:bg-muted cursor-pointer">
-                    <Ban className="w-4 h-4 mr-2" />
-                    Block
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  const renderFriendRequestsDetail = () => {
-    return (
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <button onClick={() => setDetailView(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-          <h2 className="text-2xl font-semibold">Friend Requests</h2>
-        </div>
-
-        {/* Friend Requests List */}
-        <div className="flex-1 overflow-y-auto space-y-4">
-          {mockFriendRequests.map((request) => (
-            <div key={request.id} className="p-4 border border-border rounded-xl bg-card">
-              <div className="flex items-start gap-3 mb-4">
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={request.avatar || "/placeholder.svg"} alt={request.name} />
-                  <AvatarFallback>{request.name[0]}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <div className="font-medium">{request.username}</div>
-                  <div className="text-sm text-muted-foreground">{request.name}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{request.mutualFriends} mutual friends</div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button className="flex-1 bg-[#0095f6] hover:bg-[#0095f6]/90">
-                  <UserCheck className="w-4 h-4 mr-2" />
-                  Accept
-                </Button>
-                <Button variant="outline" className="flex-1 border-border hover:bg-muted bg-transparent">
-                  <UserX className="w-4 h-4 mr-2" />
-                  Decline
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
 
   const renderBlockedUsersDetail = () => {
     return (
@@ -1268,10 +1117,10 @@ export default function SettingsPage() {
 
   const renderSettingsContent = () => {
     if (detailView === "friends-list") {
-      return renderFriendsListDetail()
+      return <FriendsListDetail searchQuery={searchQuery} setSearchQuery={setSearchQuery} onBack={() => setDetailView(null)} />
     }
     if (detailView === "friend-requests") {
-      return renderFriendRequestsDetail()
+      return <FriendRequestsDetail onBack={() => setDetailView(null)} />
     }
     if (detailView === "blocked-users") {
       return renderBlockedUsersDetail()
