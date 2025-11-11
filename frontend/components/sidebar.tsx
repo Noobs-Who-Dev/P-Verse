@@ -13,6 +13,7 @@ import {
   Bookmark,
   Moon,
   AlertCircle,
+    Users
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
@@ -26,6 +27,7 @@ const navItems = [
   { icon: Heart, label: "Notifications" },
   { icon: PlusSquare, label: "Create" },
   { icon: User, label: "Profile" },
+  { icon: Users, label: "User Management", url: "/users" }
 ]
 
 interface SidebarProps {
