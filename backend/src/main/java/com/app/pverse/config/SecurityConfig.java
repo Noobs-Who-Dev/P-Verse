@@ -50,8 +50,8 @@ public class SecurityConfig {
             .formLogin(formLogin -> formLogin.disable())  // Tắt Form Login
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()  // Public endpoints
-                .anyRequest().permitAll()  // Tất cả các request khác đều cho phép (test mode)
+                .requestMatchers("/api/auth/**").permitAll()  // Public endpoints: login, register
+                .anyRequest().authenticated()  // Tất cả các request khác phải đăng nhập
             )
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
