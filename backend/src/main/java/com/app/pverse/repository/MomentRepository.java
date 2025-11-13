@@ -2,7 +2,7 @@ package com.app.pverse.repository;
 
 import com.app.pverse.entity.Moment;
 import com.app.pverse.entity.Moment.Visibility;
-import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -15,40 +15,44 @@ import java.util.List;
 public interface MomentRepository extends JpaRepository<Moment, Long> {
 
     /**
-     * Lấy moments của một user (phân trang)
+     * Lấy moments của một user (phân trang với Slice - không COUNT)
      */
-    Page<Moment> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
+    Slice<Moment> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
     /**
      * Lấy moments của user với visibility cụ thể
      */
-    Page<Moment> findByUserIdAndVisibilityOrderByCreatedAtDesc(
-        Long userId,
-        Visibility visibility,
-        Pageable pageable
+    Slice<Moment> findByUserIdAndVisibilityOrderByCreatedAtDesc(
+            Long userId,
+            Visibility visibility,
+            Pageable pageable
     );
 
     /**
-     * Lấy feed moments từ danh sách bạn bè
-     * (chỉ lấy moments có visibility = ALL_FRIENDS)
+     * Lấy feed moments - Optimized query
+     * Bao gồm:
+     * - Moments của friends với visibility = ALL_FRIENDS
+     * - Moments được share riêng cho user (SPECIFIC_PERSON)
+     * - Moments của chính user (all visibilities)
      */
-    @Query("SELECT m FROM Moment m " +
-           "WHERE m.user.id IN :friendIds " +
-           "AND m.visibility = 'ALL_FRIENDS' " +
-           "ORDER BY m.createdAt DESC")
-    Page<Moment> findFeedMoments(@Param("friendIds") List<Long> friendIds, Pageable pageable);
+    @Query("SELECT DISTINCT m FROM Moment m " +
+            "WHERE (m.visibility = 'ALL_FRIENDS' AND m.user.id IN :friendIds) " +
+            "OR (m.visibility = 'SPECIFIC_PERSON' AND m.specificUser.id = :currentUserId) " +
+            "OR (m.user.id = :currentUserId) " +
+            "ORDER BY m.createdAt DESC, m.id DESC")
+    Slice<Moment> findFeedMoments(
+            @Param("friendIds") List<Long> friendIds,
+            @Param("currentUserId") Long currentUserId,
+            Pageable pageable
+    );
 
     /**
-     * Lấy feed moments từ danh sách bạn bè (bao gồm cả moments của user hiện tại)
+     * Lấy moments được share riêng cho user (SPECIFIC_PERSON)
      */
-    @Query("SELECT m FROM Moment m " +
-           "WHERE (m.user.id IN :friendIds OR m.user.id = :currentUserId) " +
-           "AND (m.visibility = 'ALL_FRIENDS' OR m.user.id = :currentUserId) " +
-           "ORDER BY m.createdAt DESC")
-    Page<Moment> findFeedMomentsIncludingSelf(
-        @Param("friendIds") List<Long> friendIds,
-        @Param("currentUserId") Long currentUserId,
-        Pageable pageable
+    Slice<Moment> findByVisibilityAndSpecificUserIdOrderByCreatedAtDesc(
+            Visibility visibility,
+            Long specificUserId,
+            Pageable pageable
     );
 
     /**
@@ -62,8 +66,17 @@ public interface MomentRepository extends JpaRepository<Moment, Long> {
     long countByUserIdAndVisibility(Long userId, Visibility visibility);
 
     /**
-     * Lấy moments mới nhất của user
+     * Lấy moments mới nhất của user (cho profile preview)
      */
     List<Moment> findTop10ByUserIdOrderByCreatedAtDesc(Long userId);
-}
 
+    /**
+     * Kiểm tra user có quyền xem moment không
+     */
+    @Query("SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END FROM Moment m " +
+            "WHERE m.id = :momentId " +
+            "AND (m.user.id = :userId " +
+            "OR m.visibility = 'ALL_FRIENDS' " +
+            "OR (m.visibility = 'SPECIFIC_PERSON' AND m.specificUser.id = :userId))")
+    boolean canUserViewMoment(@Param("momentId") Long momentId, @Param("userId") Long userId);
+}
