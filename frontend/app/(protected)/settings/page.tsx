@@ -332,7 +332,7 @@ export default function SettingsPage() {
       });
 
       toast({
-        title: "✅ Success",
+        title: "Success",
         description: "Settings saved successfully!",
       });
 
@@ -340,7 +340,7 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Failed to save settings:', error);
       toast({
-        title: "❌ Error",
+        title: "Error",
         description: "Failed to save settings. Please try again.",
         variant: "destructive",
       });
