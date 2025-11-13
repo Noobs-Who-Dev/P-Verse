@@ -33,11 +33,23 @@ export default function ProfilePage() {
     if (item === "Home") {
       router.push("/")
     } else if (item === "Search") {
-      setSidebarCollapsed(true)
-      setActivePanel("search")
+      // Toggle: if already open, close it; if closed, open it
+      if (activePanel === "search") {
+        setSidebarCollapsed(false)
+        setActivePanel(null)
+      } else {
+        setSidebarCollapsed(true)
+        setActivePanel("search")
+      }
     } else if (item === "Notifications") {
-      setSidebarCollapsed(true)
-      setActivePanel("notifications")
+      // Toggle: if already open, close it; if closed, open it
+      if (activePanel === "notifications") {
+        setSidebarCollapsed(false)
+        setActivePanel(null)
+      } else {
+        setSidebarCollapsed(true)
+        setActivePanel("notifications")
+      }
     } else if (item === "Create") {
       setShowCreateModal(true)
     } else if (item === "Messages") {
@@ -72,13 +84,6 @@ export default function ProfilePage() {
         {activePanel === "search" && <SearchPanel onClose={handleClosePanel} />}
         {activePanel === "notifications" && <NotificationsPanel onClose={handleClosePanel} />}
 
-        {activePanel && (
-          <div
-            className="fixed inset-0 bg-black/20 z-30"
-            style={{ marginLeft: sidebarCollapsed ? "73px" : "245px" }}
-            onClick={handleClosePanel}
-          />
-        )}
 
         <main className={`flex-1 ${sidebarCollapsed ? "ml-[73px]" : "ml-[245px]"} transition-all duration-300`}>
           <div className="max-w-[935px] mx-auto px-5 py-8">

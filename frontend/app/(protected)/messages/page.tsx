@@ -73,11 +73,23 @@ export default function MessagesPage() {
     } else if (item === "Profile") {
       router.push("/profile")
     } else if (item === "Search") {
-      setSidebarCollapsed(true)
-      setActivePanel("search")
+      // Toggle: if already open, close it; if closed, open it
+      if (activePanel === "search") {
+        setSidebarCollapsed(true)
+        setActivePanel(null)
+      } else {
+        setSidebarCollapsed(true)
+        setActivePanel("search")
+      }
     } else if (item === "Notifications") {
-      setSidebarCollapsed(true)
-      setActivePanel("notifications")
+      // Toggle: if already open, close it; if closed, open it
+      if (activePanel === "notifications") {
+        setSidebarCollapsed(true)
+        setActivePanel(null)
+      } else {
+        setSidebarCollapsed(true)
+        setActivePanel("notifications")
+      }
     } else if (item === "Create") {
       setShowCreateModal(true)
     } else if (item === "Messages") {
@@ -102,6 +114,7 @@ export default function MessagesPage() {
 
       {activePanel === "search" && <SearchPanel onClose={handleClosePanel} />}
       {activePanel === "notifications" && <NotificationsPanel onClose={handleClosePanel} />}
+
 
       <div className="w-[400px] border-r border-border flex flex-col ml-[73px]">
         <div className="p-4 border-b border-border flex items-center justify-between">

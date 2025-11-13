@@ -1,7 +1,6 @@
 package com.app.pverse.repository;
 
 import com.app.pverse.entity.Friendship;
-import com.app.pverse.entity.Friendship.FriendshipStatus;
 import com.app.pverse.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -14,67 +13,68 @@ import java.util.Optional;
 @Repository
 public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
 
+    Optional<Friendship> findByUserAndFriend(User user, User friend);
+
     /**
-     * Tìm friendship giữa 2 user (bất kể thứ tự)
+     * Tìm friendship giữa 2 user (không quan tâm thứ tự)
      */
     @Query("SELECT f FROM Friendship f WHERE " +
-           "(f.user.id = :userId1 AND f.friend.id = :userId2) OR " +
-           "(f.user.id = :userId2 AND f.friend.id = :userId1)")
-    Optional<Friendship> findByUserIds(@Param("userId1") Long userId1,
-                                       @Param("userId2") Long userId2);
+            "(f.user.id = :userId1 AND f.friend.id = :userId2) OR " +
+            "(f.user.id = :userId2 AND f.friend.id = :userId1)")
+    Optional<Friendship> findFriendshipBetween(@Param("userId1") Long userId1,
+                                               @Param("userId2") Long userId2);
 
     /**
-     * Lấy danh sách bạn bè của user (status = ACCEPTED)
+     * Lấy danh sách bạn bè đã accepted
+     * FIX: Sử dụng 2 query riêng biệt thay vì CASE WHEN
      */
-    @Query("SELECT CASE " +
-           "WHEN f.user.id = :userId THEN f.friend " +
-           "ELSE f.user END " +
-           "FROM Friendship f " +
-           "WHERE (f.user.id = :userId OR f.friend.id = :userId) " +
-           "AND f.status = :status")
-    List<User> findFriendsByUserIdAndStatus(@Param("userId") Long userId,
-                                            @Param("status") FriendshipStatus status);
+    @Query("SELECT f.friend FROM Friendship f WHERE " +
+            "f.user.id = :userId AND f.status = 'ACCEPTED'")
+    List<User> findAcceptedFriendsAsUser(@Param("userId") Long userId);
+
+    @Query("SELECT f.user FROM Friendship f WHERE " +
+            "f.friend.id = :userId AND f.status = 'ACCEPTED'")
+    List<User> findAcceptedFriendsAsFriend(@Param("userId") Long userId);
 
     /**
-     * Lấy danh sách yêu cầu kết bạn đã gửi (outgoing requests)
+     * Lấy danh sách friend requests đã gửi (đang pending)
      */
-    @Query("SELECT f FROM Friendship f WHERE f.requester.id = :userId AND f.status = 'PENDING'")
-    List<Friendship> findOutgoingRequests(@Param("userId") Long userId);
+    @Query("SELECT f.friend FROM Friendship f WHERE " +
+            "f.user.id = :userId AND f.requester.id = :userId AND f.status = 'PENDING'")
+    List<User> findSentRequestsAsUser(@Param("userId") Long userId);
+
+    @Query("SELECT f.user FROM Friendship f WHERE " +
+            "f.friend.id = :userId AND f.requester.id = :userId AND f.status = 'PENDING'")
+    List<User> findSentRequestsAsFriend(@Param("userId") Long userId);
 
     /**
-     * Lấy danh sách yêu cầu kết bạn nhận được (incoming requests)
+     * Lấy danh sách friend requests nhận được (đang pending)
      */
-    @Query("SELECT f FROM Friendship f WHERE " +
-           "(f.user.id = :userId OR f.friend.id = :userId) " +
-           "AND f.requester.id != :userId " +
-           "AND f.status = 'PENDING'")
-    List<Friendship> findIncomingRequests(@Param("userId") Long userId);
+    @Query("SELECT f.friend FROM Friendship f WHERE " +
+            "f.user.id = :userId AND f.requester.id != :userId AND f.status = 'PENDING'")
+    List<User> findReceivedRequestsAsUser(@Param("userId") Long userId);
+
+    @Query("SELECT f.user FROM Friendship f WHERE " +
+            "f.friend.id = :userId AND f.requester.id != :userId AND f.status = 'PENDING'")
+    List<User> findReceivedRequestsAsFriend(@Param("userId") Long userId);
 
     /**
-     * Kiểm tra 2 user đã là bạn chưa
+     * Kiểm tra trạng thái bạn bè giữa 2 user
      */
-    @Query("SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END " +
-           "FROM Friendship f WHERE " +
-           "((f.user.id = :userId1 AND f.friend.id = :userId2) OR " +
-           "(f.user.id = :userId2 AND f.friend.id = :userId1)) " +
-           "AND f.status = 'ACCEPTED'")
-    boolean areFriends(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
+    @Query("SELECT f.status FROM Friendship f WHERE " +
+            "(f.user.id = :userId1 AND f.friend.id = :userId2) OR " +
+            "(f.user.id = :userId2 AND f.friend.id = :userId1)")
+    Optional<Friendship.FriendshipStatus> findStatusBetween(@Param("userId1") Long userId1,
+                                                            @Param("userId2") Long userId2);
 
     /**
-     * Kiểm tra đã có friendship request giữa 2 user chưa (bất kể status)
+     * Kiểm tra user có phải là requester không
      */
-    @Query("SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END " +
-           "FROM Friendship f WHERE " +
-           "(f.user.id = :userId1 AND f.friend.id = :userId2) OR " +
-           "(f.user.id = :userId2 AND f.friend.id = :userId1)")
-    boolean existsByUserIds(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
-
-    /**
-     * Đếm số bạn bè của user
-     */
-    @Query("SELECT COUNT(f) FROM Friendship f WHERE " +
-           "(f.user.id = :userId OR f.friend.id = :userId) " +
-           "AND f.status = 'ACCEPTED'")
-    long countFriends(@Param("userId") Long userId);
+    @Query("SELECT CASE WHEN f.requester.id = :userId THEN true ELSE false END " +
+            "FROM Friendship f WHERE " +
+            "((f.user.id = :userId1 AND f.friend.id = :userId2) OR " +
+            "(f.user.id = :userId2 AND f.friend.id = :userId1))")
+    Optional<Boolean> isRequester(@Param("userId1") Long userId1,
+                                  @Param("userId2") Long userId2,
+                                  @Param("userId") Long userId);
 }
-

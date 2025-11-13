@@ -53,7 +53,7 @@ public class Friendship {
     private LocalDateTime updatedAt;
 
     public enum FriendshipStatus {
-        PENDING, ACCEPTED, REJECTED, BLOCKED
+        PENDING, ACCEPTED, BLOCKED
     }
 
     /**
