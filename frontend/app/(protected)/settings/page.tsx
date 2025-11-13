@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Sidebar } from "@/components/sidebar"
@@ -7,6 +8,9 @@ import { MessengerPopup } from "@/components/messenger-popup"
 import { SearchPanel } from "@/components/search-panel"
 import { NotificationsPanel } from "@/components/notifications-panel"
 import { CreatePostModal } from "@/components/create-post-modal"
+import { FriendsListDetail } from "@/components/settings/friends-list-detail"
+import { FriendRequestsDetail } from "@/components/settings/friend-requests-detail"
+import { SentRequestsDetail } from "@/components/settings/sent-requests-detail"
 import {
   User,
   Users,
@@ -19,13 +23,6 @@ import {
   Info,
   ChevronRight,
   ChevronLeft,
-  Search,
-  MoreVertical,
-  UserMinus,
-  Ban,
-  MessageCircle,
-  UserCheck,
-  UserX,
   X,
   Smartphone,
   Trash2,
@@ -40,7 +37,6 @@ import {
   Music,
   Gamepad2,
   Sticker,
-  Save,
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -49,10 +45,6 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useEffect, useState, useRef } from 'react';
-import { settingsService } from '@/app/services/settingsService';
-import { useToast } from "@/hooks/use-toast";
 
 const settingsCategories = [
   {
@@ -82,11 +74,8 @@ const settingsCategories = [
 ]
 
 export default function SettingsPage() {
-  const userId = 1;
-  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter()
-  const { theme: nextTheme, setTheme } = useTheme()
-  const { toast } = useToast()
+  const { theme, setTheme } = useTheme()
   const [selectedSetting, setSelectedSetting] = useState("notifications")
   const [detailView, setDetailView] = useState<string | null>(null)
   const [messengerOpen, setMessengerOpen] = useState(false)
@@ -98,25 +87,6 @@ export default function SettingsPage() {
   const [emailRevealed, setEmailRevealed] = useState(false)
   const [phoneRevealed, setPhoneRevealed] = useState(false)
   const [language, setLanguage] = useState("en")
-
-  // Local theme state to avoid bounce-back from next-themes async update
-  const [localTheme, setLocalTheme] = useState<string>("")
-
-  // Ref to track if user is actively toggling theme (prevent race condition)
-  const isTogglingTheme = useRef(false);
-
-  // Ref to track if component has mounted and settings loaded
-  const hasLoadedSettings = useRef(false);
-
-  // Track pending changes for Save button
-  const [originalSettings, setOriginalSettings] = useState({
-    theme: "",
-    language: "",
-    notificationsEnabled: false
-  });
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-
   const [notificationSettings, setNotificationSettings] = useState({
     desktopNotifications: false,
     newMoments: false,
@@ -211,167 +181,32 @@ export default function SettingsPage() {
     },
   ]
 
-  const mockFriends = [
-    { id: "1", username: "sarah.johnson", name: "Sarah Johnson", avatar: "/woman-profile.jpg" },
-    { id: "2", username: "mike.chen", name: "Mike Chen", avatar: "/asian-man-profile.jpg" },
-    { id: "3", username: "emma.wilson", name: "Emma Wilson", avatar: "/blonde-woman-profile.jpg" },
-    { id: "4", username: "james.brown", name: "James Brown", avatar: "/black-man-profile.jpg" },
-    { id: "5", username: "olivia.davis", name: "Olivia Davis", avatar: "/redhead-woman-profile.jpg" },
-    { id: "6", username: "alex.martinez", name: "Alex Martinez", avatar: "/latino-man-profile.jpg" },
-    { id: "7", username: "sophia.lee", name: "Sophia Lee", avatar: "/korean-woman-profile.jpg" },
-    { id: "8", username: "daniel.kim", name: "Daniel Kim", avatar: "/korean-man-profile.jpg" },
-  ]
-
-  const mockFriendRequests = [
-    {
-      id: "1",
-      username: "jessica.taylor",
-      name: "Jessica Taylor",
-      avatar: "/brunette-woman-profile.jpg",
-      mutualFriends: 5,
-    },
-    {
-      id: "2",
-      username: "ryan.anderson",
-      name: "Ryan Anderson",
-      avatar: "/bearded-man-profile.jpg",
-      mutualFriends: 3,
-    },
-    { id: "3", username: "mia.garcia", name: "Mia Garcia", avatar: "/latina-woman-profile.jpg", mutualFriends: 8 },
-  ]
-
   const mockBlockedUsers = [
     { id: "1", username: "spam.account", name: "Spam Account", avatar: "/generic-profile.jpg" },
     { id: "2", username: "toxic.user", name: "Toxic User", avatar: "/anonymous-profile.jpg" },
   ]
 
-  // Load settings from backend
-  useEffect(() => {
-    // Only load settings once
-    if (hasLoadedSettings.current) {
-      console.log('[Settings] Skipping reload - already loaded');
-      return;
-    }
-
-    const loadSettings = async () => {
-      try {
-        console.log('[Settings] Loading settings from backend...');
-        const data = await settingsService.getSettings(userId);
-
-        // Sync backend data với UI state
-        const themeValue = data.theme?.toLowerCase() || 'light';
-        setTheme(themeValue);
-        setLocalTheme(themeValue);
-
-        if (data.language === 'VI') setLanguage('vi');
-        if (data.language === 'EN') setLanguage('en');
-        if (data.notificationsEnabled !== undefined) {
-          setNotificationSettings(prev => ({
-            ...prev,
-            desktopNotifications: data.notificationsEnabled
-          }));
-        }
-
-        // Save original settings
-        setOriginalSettings({
-          theme: themeValue,
-          language: data.language === 'VI' ? 'vi' : 'en',
-          notificationsEnabled: data.notificationsEnabled || false
-        });
-
-        console.log('[Settings] Loaded:', { theme: themeValue, language: data.language });
-        setIsLoading(false);
-        hasLoadedSettings.current = true; // Mark as loaded
-      } catch (error) {
-        console.error('Failed to load settings:', error);
-        setIsLoading(false);
-      }
-    };
-    loadSettings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]); // Only run on mount and when userId changes
-
-
-  // Track changes using localTheme instead of nextTheme
-  useEffect(() => {
-    // Only track changes after initial load and when localTheme is defined
-    if (isLoading || !localTheme) return;
-
-    const themeChanged = localTheme !== originalSettings.theme;
-    const languageChanged = language !== originalSettings.language;
-    const notificationsChanged = notificationSettings.desktopNotifications !== originalSettings.notificationsEnabled;
-
-    setHasUnsavedChanges(themeChanged || languageChanged || notificationsChanged);
-  }, [localTheme, language, notificationSettings.desktopNotifications, originalSettings, isLoading]);
-
-  // Save all changes
-  const handleSaveChanges = async () => {
-    try {
-      setIsSaving(true);
-
-      const settingsData = {
-        theme: localTheme.toUpperCase(),
-        language: language === 'vi' ? 'VI' : 'EN',
-        notificationsEnabled: notificationSettings.desktopNotifications
-      };
-
-      await settingsService.updateSettings(userId, settingsData);
-
-      // Update original settings
-      setOriginalSettings({
-        theme: localTheme,
-        language: language,
-        notificationsEnabled: notificationSettings.desktopNotifications
-      });
-
-      toast({
-        title: "✅ Success",
-        description: "Settings saved successfully!",
-      });
-
-      setHasUnsavedChanges(false);
-    } catch (error) {
-      console.error('Failed to save settings:', error);
-      toast({
-        title: "❌ Error",
-        description: "Failed to save settings. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Cancel changes
-  const handleCancelChanges = () => {
-    if (originalSettings.theme) {
-      setTheme(originalSettings.theme);
-      setLocalTheme(originalSettings.theme);
-    }
-    setLanguage(originalSettings.language);
-    setNotificationSettings(prev => ({
-      ...prev,
-      desktopNotifications: originalSettings.notificationsEnabled
-    }));
-    setHasUnsavedChanges(false);
-
-    toast({
-      title: "Changes discarded",
-      description: "Settings have been reset to last saved state.",
-    });
-  };
-
-  if (isLoading) return <div className="p-6">Loading settings...</div>;
-
   const handleNavClick = (item: string) => {
     if (item === "Home") {
       router.push("/")
     } else if (item === "Search") {
-      setSidebarCollapsed(true)
-      setActivePanel("search")
+      // Toggle: if already open, close it; if closed, open it
+      if (activePanel === "search") {
+        setSidebarCollapsed(false)
+        setActivePanel(null)
+      } else {
+        setSidebarCollapsed(true)
+        setActivePanel("search")
+      }
     } else if (item === "Notifications") {
-      setSidebarCollapsed(true)
-      setActivePanel("notifications")
+      // Toggle: if already open, close it; if closed, open it
+      if (activePanel === "notifications") {
+        setSidebarCollapsed(false)
+        setActivePanel(null)
+      } else {
+        setSidebarCollapsed(true)
+        setActivePanel("notifications")
+      }
     } else if (item === "Create") {
       setShowCreateModal(true)
     } else if (item === "Messages") {
@@ -604,122 +439,6 @@ export default function SettingsPage() {
     )
   }
 
-  const renderFriendsListDetail = () => {
-    const filteredFriends = mockFriends.filter(
-      (friend) =>
-        friend.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        friend.name.toLowerCase().includes(searchQuery.toLowerCase()),
-    )
-
-    return (
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <button onClick={() => setDetailView(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-          <h2 className="text-2xl font-semibold">Friends List</h2>
-        </div>
-
-        {/* Search */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-secondary border-none"
-          />
-        </div>
-
-        {/* Friends List */}
-        <div className="flex-1 overflow-y-auto space-y-2">
-          {filteredFriends.map((friend) => (
-            <div
-              key={friend.id}
-              className="flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={friend.avatar || "/placeholder.svg"} alt={friend.name} />
-                  <AvatarFallback>{friend.name[0]}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-medium">{friend.username}</div>
-                  <div className="text-sm text-muted-foreground">{friend.name}</div>
-                </div>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="p-2 hover:bg-secondary rounded-full transition-colors">
-                    <MoreVertical className="w-5 h-5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-card border-border">
-                  <DropdownMenuItem className="hover:bg-muted cursor-pointer">
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    Message
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="hover:bg-muted cursor-pointer">
-                    <UserMinus className="w-4 h-4 mr-2" />
-                    Unfriend
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="text-red-500 hover:bg-muted cursor-pointer">
-                    <Ban className="w-4 h-4 mr-2" />
-                    Block
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  const renderFriendRequestsDetail = () => {
-    return (
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <button onClick={() => setDetailView(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-          <h2 className="text-2xl font-semibold">Friend Requests</h2>
-        </div>
-
-        {/* Friend Requests List */}
-        <div className="flex-1 overflow-y-auto space-y-4">
-          {mockFriendRequests.map((request) => (
-            <div key={request.id} className="p-4 border border-border rounded-xl bg-card">
-              <div className="flex items-start gap-3 mb-4">
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={request.avatar || "/placeholder.svg"} alt={request.name} />
-                  <AvatarFallback>{request.name[0]}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <div className="font-medium">{request.username}</div>
-                  <div className="text-sm text-muted-foreground">{request.name}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{request.mutualFriends} mutual friends</div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button className="flex-1 bg-[#0095f6] hover:bg-[#0095f6]/90">
-                  <UserCheck className="w-4 h-4 mr-2" />
-                  Accept
-                </Button>
-                <Button variant="outline" className="flex-1 border-border hover:bg-muted bg-transparent">
-                  <UserX className="w-4 h-4 mr-2" />
-                  Decline
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
 
   const renderBlockedUsersDetail = () => {
     return (
@@ -785,6 +504,17 @@ export default function SettingsPage() {
             <div className="flex-1 text-left">
               <h4 className="text-base font-medium mb-1">Pending Friend Requests</h4>
               <p className="text-sm text-muted-foreground">View and manage incoming friend requests.</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
+          </button>
+
+          <button
+            onClick={() => setDetailView("sent-requests")}
+            className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-muted transition-colors border border-border"
+          >
+            <div className="flex-1 text-left">
+              <h4 className="text-base font-medium mb-1">Sent Friend Requests</h4>
+              <p className="text-sm text-muted-foreground">View and manage your outgoing friend requests.</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
           </button>
@@ -1020,22 +750,6 @@ export default function SettingsPage() {
   }
 
   const renderAppearanceSettings = () => {
-    const handleThemeToggle = (checked: boolean) => {
-      console.log('[Theme Toggle] Toggling theme to:', checked ? 'dark' : 'light');
-      isTogglingTheme.current = true;
-      const newTheme = checked ? "dark" : "light";
-
-      // Update both states immediately
-      setLocalTheme(newTheme);
-      setTheme(newTheme);
-
-      // Reset flag after a short delay to allow next-themes to update
-      setTimeout(() => {
-        isTogglingTheme.current = false;
-        console.log('[Theme Toggle] Toggle complete');
-      }, 100);
-    };
-
     return (
       <div className="space-y-6">
         {/* Theme Toggle */}
@@ -1047,10 +761,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex items-center gap-3">
               <Sun className="w-5 h-5 text-muted-foreground" />
-              <Switch
-                checked={localTheme === "dark"}
-                onCheckedChange={handleThemeToggle}
-              />
+              <Switch checked={theme === "dark"} onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")} />
               <Moon className="w-5 h-5 text-muted-foreground" />
             </div>
           </div>
@@ -1430,10 +1141,13 @@ export default function SettingsPage() {
 
   const renderSettingsContent = () => {
     if (detailView === "friends-list") {
-      return renderFriendsListDetail()
+      return <FriendsListDetail searchQuery={searchQuery} setSearchQuery={setSearchQuery} onBack={() => setDetailView(null)} />
     }
     if (detailView === "friend-requests") {
-      return renderFriendRequestsDetail()
+      return <FriendRequestsDetail onBack={() => setDetailView(null)} />
+    }
+    if (detailView === "sent-requests") {
+      return <SentRequestsDetail onBack={() => setDetailView(null)} />
     }
     if (detailView === "blocked-users") {
       return renderBlockedUsersDetail()
@@ -1496,13 +1210,6 @@ export default function SettingsPage() {
         {activePanel === "search" && <SearchPanel onClose={handleClosePanel} />}
         {activePanel === "notifications" && <NotificationsPanel onClose={handleClosePanel} />}
 
-        {activePanel && (
-          <div
-            className="fixed inset-0 bg-black/20 z-30"
-            style={{ marginLeft: sidebarCollapsed ? "73px" : "245px" }}
-            onClick={handleClosePanel}
-          />
-        )}
 
         <main className={`flex-1 ${sidebarCollapsed ? "ml-[73px]" : "ml-[245px]"} transition-all duration-300`}>
           <div className="flex h-screen">
@@ -1546,51 +1253,11 @@ export default function SettingsPage() {
             </div>
 
             {/* Right content - Settings detail */}
-            <div className="flex-1 overflow-y-auto bg-background relative">
-              <div className="p-8 pb-24">
+            <div className="flex-1 overflow-y-auto bg-background">
+              <div className="p-8">
                 {!detailView && <h2 className="text-2xl font-semibold mb-8">{getSelectedSettingLabel()}</h2>}
                 {renderSettingsContent()}
               </div>
-
-              {/* Sticky Save Changes Footer */}
-              {hasUnsavedChanges && (selectedSetting === "appearance" || selectedSetting === "notifications") && (
-                <div className="sticky bottom-0 left-0 right-0 bg-background border-t border-border shadow-lg">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between max-w-4xl mx-auto">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                        <p className="text-sm text-muted-foreground">You have unsaved changes</p>
-                      </div>
-                      <div className="flex gap-3">
-                        <Button
-                          variant="outline"
-                          onClick={handleCancelChanges}
-                          disabled={isSaving}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={handleSaveChanges}
-                          disabled={isSaving}
-                          className="min-w-[140px]"
-                        >
-                          {isSaving ? (
-                            <>
-                              <span className="animate-spin mr-2">⏳</span>
-                              Saving...
-                            </>
-                          ) : (
-                            <>
-                              <Save className="w-4 h-4 mr-2" />
-                              Save Changes
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </main>

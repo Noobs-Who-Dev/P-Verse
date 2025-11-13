@@ -40,20 +40,22 @@ public interface MomentReactionRepository extends JpaRepository<MomentReaction, 
 
     /**
      * Kiểm tra user đã react moment chưa
+     * EXISTS query - fastest cho boolean check
      */
     boolean existsByMomentIdAndUserId(Long momentId, Long userId);
 
     /**
      * Xóa reaction của user trên moment
+     * Phải wrap trong @Transactional ở Service layer
      */
     void deleteByMomentIdAndUserId(Long momentId, Long userId);
 
     /**
      * Đếm số lượng từng loại reaction của moment
+     * Return Object[] = [ReactionType, Long count]
      */
     @Query("SELECT r.reactionType, COUNT(r) FROM MomentReaction r " +
-           "WHERE r.moment.id = :momentId " +
-           "GROUP BY r.reactionType")
+            "WHERE r.moment.id = :momentId " +
+            "GROUP BY r.reactionType")
     List<Object[]> countReactionsByType(@Param("momentId") Long momentId);
 }
-
