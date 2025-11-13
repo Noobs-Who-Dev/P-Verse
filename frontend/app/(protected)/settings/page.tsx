@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Sidebar } from "@/components/sidebar"
@@ -41,6 +40,7 @@ import {
   Music,
   Gamepad2,
   Sticker,
+  Save,
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -50,6 +50,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useEffect, useState, useRef } from 'react';
+import { settingsService } from '@/app/services/settingsService';
+import { useToast } from "@/hooks/use-toast";
 
 const settingsCategories = [
   {
@@ -79,8 +82,11 @@ const settingsCategories = [
 ]
 
 export default function SettingsPage() {
+  const userId = 1;
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter()
-  const { theme, setTheme } = useTheme()
+  const { theme: nextTheme, setTheme } = useTheme()
+  const { toast } = useToast()
   const [selectedSetting, setSelectedSetting] = useState("notifications")
   const [detailView, setDetailView] = useState<string | null>(null)
   const [messengerOpen, setMessengerOpen] = useState(false)
@@ -92,6 +98,25 @@ export default function SettingsPage() {
   const [emailRevealed, setEmailRevealed] = useState(false)
   const [phoneRevealed, setPhoneRevealed] = useState(false)
   const [language, setLanguage] = useState("en")
+
+  // Local theme state to avoid bounce-back from next-themes async update
+  const [localTheme, setLocalTheme] = useState<string>("")
+
+  // Ref to track if user is actively toggling theme (prevent race condition)
+  const isTogglingTheme = useRef(false);
+
+  // Ref to track if component has mounted and settings loaded
+  const hasLoadedSettings = useRef(false);
+
+  // Track pending changes for Save button
+  const [originalSettings, setOriginalSettings] = useState({
+    theme: "",
+    language: "",
+    notificationsEnabled: false
+  });
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [notificationSettings, setNotificationSettings] = useState({
     desktopNotifications: false,
     newMoments: false,
@@ -219,6 +244,124 @@ export default function SettingsPage() {
     { id: "1", username: "spam.account", name: "Spam Account", avatar: "/generic-profile.jpg" },
     { id: "2", username: "toxic.user", name: "Toxic User", avatar: "/anonymous-profile.jpg" },
   ]
+
+  // Load settings from backend
+  useEffect(() => {
+    // Only load settings once
+    if (hasLoadedSettings.current) {
+      console.log('[Settings] Skipping reload - already loaded');
+      return;
+    }
+
+    const loadSettings = async () => {
+      try {
+        console.log('[Settings] Loading settings from backend...');
+        const data = await settingsService.getSettings(userId);
+
+        // Sync backend data với UI state
+        const themeValue = data.theme?.toLowerCase() || 'light';
+        setTheme(themeValue);
+        setLocalTheme(themeValue);
+
+        if (data.language === 'VI') setLanguage('vi');
+        if (data.language === 'EN') setLanguage('en');
+        if (data.notificationsEnabled !== undefined) {
+          setNotificationSettings(prev => ({
+            ...prev,
+            desktopNotifications: data.notificationsEnabled
+          }));
+        }
+
+        // Save original settings
+        setOriginalSettings({
+          theme: themeValue,
+          language: data.language === 'VI' ? 'vi' : 'en',
+          notificationsEnabled: data.notificationsEnabled || false
+        });
+
+        console.log('[Settings] Loaded:', { theme: themeValue, language: data.language });
+        setIsLoading(false);
+        hasLoadedSettings.current = true; // Mark as loaded
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+        setIsLoading(false);
+      }
+    };
+    loadSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]); // Only run on mount and when userId changes
+
+
+  // Track changes using localTheme instead of nextTheme
+  useEffect(() => {
+    // Only track changes after initial load and when localTheme is defined
+    if (isLoading || !localTheme) return;
+
+    const themeChanged = localTheme !== originalSettings.theme;
+    const languageChanged = language !== originalSettings.language;
+    const notificationsChanged = notificationSettings.desktopNotifications !== originalSettings.notificationsEnabled;
+
+    setHasUnsavedChanges(themeChanged || languageChanged || notificationsChanged);
+  }, [localTheme, language, notificationSettings.desktopNotifications, originalSettings, isLoading]);
+
+  // Save all changes
+  const handleSaveChanges = async () => {
+    try {
+      setIsSaving(true);
+
+      const settingsData = {
+        theme: localTheme.toUpperCase(),
+        language: language === 'vi' ? 'VI' : 'EN',
+        notificationsEnabled: notificationSettings.desktopNotifications
+      };
+
+      await settingsService.updateSettings(userId, settingsData);
+
+      // Update original settings
+      setOriginalSettings({
+        theme: localTheme,
+        language: language,
+        notificationsEnabled: notificationSettings.desktopNotifications
+      });
+
+      toast({
+        title: "✅ Success",
+        description: "Settings saved successfully!",
+      });
+
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      toast({
+        title: "❌ Error",
+        description: "Failed to save settings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Cancel changes
+  const handleCancelChanges = () => {
+    if (originalSettings.theme) {
+      setTheme(originalSettings.theme);
+      setLocalTheme(originalSettings.theme);
+    }
+    setLanguage(originalSettings.language);
+    setNotificationSettings(prev => ({
+      ...prev,
+      desktopNotifications: originalSettings.notificationsEnabled
+    }));
+    setHasUnsavedChanges(false);
+
+    toast({
+      title: "Changes discarded",
+      description: "Settings have been reset to last saved state.",
+    });
+  };
+
+  if (isLoading) return <div className="p-6">Loading settings...</div>;
 
   const handleNavClick = (item: string) => {
     if (item === "Home") {
@@ -877,6 +1020,22 @@ export default function SettingsPage() {
   }
 
   const renderAppearanceSettings = () => {
+    const handleThemeToggle = (checked: boolean) => {
+      console.log('[Theme Toggle] Toggling theme to:', checked ? 'dark' : 'light');
+      isTogglingTheme.current = true;
+      const newTheme = checked ? "dark" : "light";
+
+      // Update both states immediately
+      setLocalTheme(newTheme);
+      setTheme(newTheme);
+
+      // Reset flag after a short delay to allow next-themes to update
+      setTimeout(() => {
+        isTogglingTheme.current = false;
+        console.log('[Theme Toggle] Toggle complete');
+      }, 100);
+    };
+
     return (
       <div className="space-y-6">
         {/* Theme Toggle */}
@@ -888,7 +1047,10 @@ export default function SettingsPage() {
             </div>
             <div className="flex items-center gap-3">
               <Sun className="w-5 h-5 text-muted-foreground" />
-              <Switch checked={theme === "dark"} onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")} />
+              <Switch
+                checked={localTheme === "dark"}
+                onCheckedChange={handleThemeToggle}
+              />
               <Moon className="w-5 h-5 text-muted-foreground" />
             </div>
           </div>
@@ -1384,11 +1546,51 @@ export default function SettingsPage() {
             </div>
 
             {/* Right content - Settings detail */}
-            <div className="flex-1 overflow-y-auto bg-background">
-              <div className="p-8">
+            <div className="flex-1 overflow-y-auto bg-background relative">
+              <div className="p-8 pb-24">
                 {!detailView && <h2 className="text-2xl font-semibold mb-8">{getSelectedSettingLabel()}</h2>}
                 {renderSettingsContent()}
               </div>
+
+              {/* Sticky Save Changes Footer */}
+              {hasUnsavedChanges && (selectedSetting === "appearance" || selectedSetting === "notifications") && (
+                <div className="sticky bottom-0 left-0 right-0 bg-background border-t border-border shadow-lg">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between max-w-4xl mx-auto">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                        <p className="text-sm text-muted-foreground">You have unsaved changes</p>
+                      </div>
+                      <div className="flex gap-3">
+                        <Button
+                          variant="outline"
+                          onClick={handleCancelChanges}
+                          disabled={isSaving}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleSaveChanges}
+                          disabled={isSaving}
+                          className="min-w-[140px]"
+                        >
+                          {isSaving ? (
+                            <>
+                              <span className="animate-spin mr-2">⏳</span>
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-2" />
+                              Save Changes
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </main>
