@@ -51,8 +51,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useEffect, useState, useRef } from 'react';
-import { settingsService } from '@/app/services/settingsService';
+import { settingsService } from '@/app/(protected)/services/settingsService';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/lib/auth/authContext';
 
 const settingsCategories = [
   {
@@ -82,7 +83,10 @@ const settingsCategories = [
 ]
 
 export default function SettingsPage() {
-  const userId = 1;
+  // ✅ Lấy userId từ user đã login (AuthContext)
+  const { user, isLoading: authLoading } = useAuth();
+  const userId = user?.id; // Dynamic userId from authenticated user
+
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter()
   const { theme: nextTheme, setTheme } = useTheme()
@@ -241,6 +245,19 @@ export default function SettingsPage() {
 
   // Load settings from backend
   useEffect(() => {
+    // ✅ Check if auth is still loading
+    if (authLoading) {
+      console.log('[Settings] Waiting for auth...');
+      return;
+    }
+
+    // ✅ Check if user is authenticated
+    if (!user || !userId) {
+      console.error('[Settings] No authenticated user, redirecting to login...');
+      router.push('/login');
+      return;
+    }
+
     // Only load settings once
     if (hasLoadedSettings.current) {
       console.log('[Settings] Skipping reload - already loaded');
@@ -249,7 +266,7 @@ export default function SettingsPage() {
 
     const loadSettings = async () => {
       try {
-        console.log('[Settings] Loading settings from backend...');
+        console.log('[Settings] Loading settings for user:', userId);
         const data = await settingsService.getSettings(userId);
 
         // Sync backend data với UI state
@@ -277,12 +294,16 @@ export default function SettingsPage() {
         hasLoadedSettings.current = true; // Mark as loaded
       } catch (error) {
         console.error('Failed to load settings:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load settings. Please try again.",
+          variant: "destructive",
+        });
         setIsLoading(false);
       }
     };
     loadSettings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]); // Only run on mount and when userId changes
+  }, [userId, user, authLoading, router, setTheme, toast]); // Run when userId/user/authLoading changes
 
 
   // Track changes using nextTheme
@@ -311,6 +332,17 @@ export default function SettingsPage() {
 
   // Save all changes
   const handleSaveChanges = async () => {
+    // ✅ Validate userId before saving
+    if (!userId) {
+      toast({
+        title: "Error",
+        description: "User not authenticated. Please login again.",
+        variant: "destructive",
+      });
+      router.push('/login');
+      return;
+    }
+
     try {
       setIsSaving(true);
 
@@ -321,7 +353,7 @@ export default function SettingsPage() {
         notificationsEnabled: notificationSettings.desktopNotifications
       };
 
-      console.log('[Save] Saving settings:', settingsData);
+      console.log('[Save] Saving settings for user:', userId, settingsData);
       await settingsService.updateSettings(userId, settingsData);
 
       // Update original settings
