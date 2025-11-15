@@ -5,10 +5,13 @@ import com.app.pverse.dto.request.RegisterRequest;
 import com.app.pverse.dto.request.UpdateProfileRequest;
 import com.app.pverse.dto.request.UpdateUserRequest;
 import com.app.pverse.dto.response.UserDto;
+import com.app.pverse.dto.response.UserProfileDto;
+import com.app.pverse.dto.response.ProfileStatsDto;
 import com.app.pverse.entity.User;
 import com.app.pverse.entity.UserSettings;
 import com.app.pverse.repository.UserRepository;
 import com.app.pverse.repository.UserSettingsRepository;
+import com.app.pverse.repository.FriendshipRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,6 +25,7 @@ import java.time.LocalDateTime;
 public class UserService {
     private final UserRepository userRepository;
     private final UserSettingsRepository settingsRepository;
+    private final FriendshipRepository friendshipRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
@@ -68,17 +72,11 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
-        if (request.getDisplayName() != null) {
+        if (request.getDisplayName() != null && !request.getDisplayName().isBlank()) {
             user.setDisplayName(request.getDisplayName());
-        }
-        if (request.getPhoneNumber() != null) {
-            user.setPhoneNumber(request.getPhoneNumber());
         }
         if (request.getBio() != null) {
             user.setBio(request.getBio());
-        }
-        if (request.getAvatarUrl() != null) {
-            user.setAvatarUrl(request.getAvatarUrl());
         }
 
         return toDto(userRepository.save(user));
@@ -122,6 +120,69 @@ public class UserService {
 
     public void updateOnlineStatus(Long userId, Boolean isOnline) {
         userRepository.updateOnlineStatus(userId, isOnline, LocalDateTime.now());
+    }
+
+    /**
+     * Lấy profile đầy đủ của user với stats
+     */
+    @Transactional(readOnly = true)
+    public UserProfileDto getUserProfile(Long targetUserId, Long viewerId) {
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+        // Check if viewing own profile
+        boolean isOwnProfile = targetUserId.equals(viewerId);
+
+        // Get stats - wrap in try-catch to prevent 500 error
+        Long friendsCount = 0L;
+        try {
+            friendsCount = friendshipRepository.countFriends(targetUserId);
+        } catch (Exception e) {
+            // Log error but don't fail the entire request
+            System.err.println("Error counting friends for user " + targetUserId + ": " + e.getMessage());
+        }
+
+        ProfileStatsDto stats = ProfileStatsDto.builder()
+                .userId(targetUserId)
+                .postsCount(0) // TODO: Implement when Post entity is ready
+                .followersCount(friendsCount != null ? friendsCount.intValue() : 0)
+                .followingCount(friendsCount != null ? friendsCount.intValue() : 0)
+                .build();
+
+        // Get relationship status if not own profile
+        String relationshipStatus = null;
+        if (!isOwnProfile) {
+            relationshipStatus = determineRelationshipStatus(viewerId, targetUserId);
+        }
+
+        return UserProfileDto.builder()
+                .user(toDto(targetUser))
+                .stats(stats)
+                .isOwnProfile(isOwnProfile)
+                .relationshipStatus(relationshipStatus)
+                .build();
+    }
+
+    /**
+     * Xác định relationship status giữa viewer và target
+     */
+    private String determineRelationshipStatus(Long viewerId, Long targetUserId) {
+        try {
+            return friendshipRepository.findFriendshipBetween(viewerId, targetUserId)
+                    .map(friendship -> {
+                        return switch (friendship.getStatus()) {
+                            case ACCEPTED -> "FRIEND";
+                            case PENDING -> friendship.getRequester().getId().equals(viewerId)
+                                    ? "PENDING_SENT"
+                                    : "PENDING_RECEIVED";
+                            default -> "STRANGER";
+                        };
+                    })
+                    .orElse("STRANGER");
+        } catch (Exception e) {
+            System.err.println("Error determining relationship status: " + e.getMessage());
+            return "STRANGER";
+        }
     }
 
     private UserDto toDto(User user) {

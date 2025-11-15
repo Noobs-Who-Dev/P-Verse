@@ -11,5 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UserProfileDto {
     private UserDto user;
-    private UserSettingsDto settings;
+    private ProfileStatsDto stats;
+    private Boolean isOwnProfile;  // Check xem co phai profile cua minh khong
+    private String relationshipStatus;  // "FRIEND", "STRANGER", "PENDING_SENT", etc.
 }

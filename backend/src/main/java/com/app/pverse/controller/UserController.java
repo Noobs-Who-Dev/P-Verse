@@ -6,6 +6,7 @@ import com.app.pverse.dto.request.UpdateSettingsRequest;
 import com.app.pverse.dto.request.UpdateUserRequest;
 import com.app.pverse.dto.response.ApiResponse;
 import com.app.pverse.dto.response.UserDto;
+import com.app.pverse.dto.response.UserProfileDto;
 import com.app.pverse.dto.response.UserSettingsDto;
 import com.app.pverse.entity.User;
 import com.app.pverse.service.UserService;
@@ -35,6 +36,14 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserDto>> getUserById(@PathVariable Long id) {
         UserDto user = userService.getUserById(id);
         return ResponseEntity.ok(ApiResponse.success(user));
+    }
+
+    @GetMapping("/{id}/profile")
+    public ResponseEntity<ApiResponse<UserProfileDto>> getUserProfile(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User viewer) {
+        UserProfileDto profile = userService.getUserProfile(id, viewer.getId());
+        return ResponseEntity.ok(ApiResponse.success(profile));
     }
 
     @GetMapping("/username/{username}")

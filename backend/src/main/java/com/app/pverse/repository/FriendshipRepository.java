@@ -77,4 +77,11 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
     Optional<Boolean> isRequester(@Param("userId1") Long userId1,
                                   @Param("userId2") Long userId2,
                                   @Param("userId") Long userId);
+
+    /**
+     * Đếm số lượng bạn bè (ACCEPTED) của user
+     */
+    @Query("SELECT COUNT(f) FROM Friendship f WHERE " +
+            "(f.user.id = :userId OR f.friend.id = :userId) AND f.status = 'ACCEPTED'")
+    Long countFriends(@Param("userId") Long userId);
 }
