@@ -46,7 +46,7 @@ public class FriendController {
 
         // Default userId for testing (no JWT)
         if (viewerId == null) {
-            viewerId = 3L;
+            viewerId = 5L;
             log.info("No userId attribute, using default: 1");
         }
 
@@ -77,7 +77,7 @@ public class FriendController {
             @RequestAttribute(value = "userId", required = false) Long viewerId) {  // ← required = false
 
         if (viewerId == null) {
-            viewerId = 3L;
+            viewerId = 5L;
         }
 
         log.info("Toggle friend request API: viewer={}, target={}",
@@ -116,7 +116,7 @@ public class FriendController {
             @RequestAttribute(value = "userId", required = false) Long viewerId) {  // ← required = false
 
         if (viewerId == null) {
-            viewerId = 3L;
+            viewerId = 5L;
         }
 
         log.info("Unfriend API: viewer={}, target={}", viewerId, targetUserId);
@@ -148,7 +148,7 @@ public class FriendController {
             @RequestAttribute(value = "userId", required = false) Long userId) {  // ← required = false
 
         if (userId == null) {
-            userId = 3L;
+            userId = 5L;
         }
 
         log.info("Get friends list API: userId={}", userId);
@@ -171,7 +171,7 @@ public class FriendController {
             @RequestAttribute(value = "userId", required = false) Long userId) {  // ← required = false
 
         if (userId == null) {
-            userId = 3L;
+            userId = 5L;
         }
 
         log.info("Get received requests API: userId={}", userId);
@@ -194,7 +194,7 @@ public class FriendController {
             @RequestAttribute(value = "userId", required = false) Long userId) {  // ← required = false
 
         if (userId == null) {
-            userId = 3L;
+            userId = 5L;
         }
 
         log.info("Get sent requests API: userId={}", userId);
