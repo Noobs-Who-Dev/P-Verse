@@ -18,6 +18,8 @@ import { toggleFriendRequest, unfriend } from "@/lib/api"
 import { UserProfile } from "@/lib/types/profile"
 import { useAuth } from "@/lib/auth/authContext"
 import { useToast } from "@/hooks/use-toast"
+import { getAvatarUrl } from "@/lib/utils/avatar"
+import { ImageCropModal } from "@/components/image-crop-modal"
 
 const userPosts = [
   { id: 1, image: "/tokyo-city-night-skyline.jpg", likes: 1234, comments: 56 },
@@ -43,6 +45,11 @@ export default function ProfilePage() {
   // New states for API integration
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+
+  // Image crop states
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null)
+  const [showCropModal, setShowCropModal] = useState(false)
 
   // Ref for file input
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -82,31 +89,107 @@ export default function ProfilePage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // TODO: Implement actual file upload to server
-    // For now, just show preview using FileReader
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng chọn file hình ảnh",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Lỗi",
+        description: "Kích thước file không được vượt quá 5MB",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Create preview URL and show crop modal
     const reader = new FileReader()
     reader.onloadend = () => {
-      toast({
-        title: "Chức năng đang phát triển",
-        description: "Upload avatar sẽ được implement sau",
-      })
+      setImageToCrop(reader.result as string)
+      setShowCropModal(true)
     }
     reader.readAsDataURL(file)
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const handleCropComplete = async (croppedImageBlob: Blob) => {
+    try {
+      setIsUploadingAvatar(true)
+      setShowCropModal(false)
+
+      // Convert blob to file
+      const croppedFile = new File([croppedImageBlob], "avatar.jpg", {
+        type: "image/jpeg",
+      })
+
+      // Upload to server
+      const updatedUser = await profileService.uploadAvatar(croppedFile)
+
+      // Update profile with new avatar
+      if (profile && targetUserId) {
+        const refreshedProfile = await profileService.getUserProfile(targetUserId)
+        setProfile(refreshedProfile)
+      }
+
+      toast({
+        title: "Thành công",
+        description: "Cập nhật ảnh đại diện thành công!",
+      })
+    } catch (error: any) {
+      console.error("Failed to upload avatar:", error)
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || "Không thể upload ảnh đại diện",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingAvatar(false)
+      setImageToCrop(null)
+    }
+  }
+
+  const handleCropCancel = () => {
+    setShowCropModal(false)
+    setImageToCrop(null)
   }
 
   const handleRemoveAvatar = async () => {
     try {
-      // TODO: Call API to remove avatar
+      setIsUploadingAvatar(true)
+
+      // Call API to remove avatar
+      await profileService.removeAvatar()
+
+      // Refresh profile
+      if (profile && targetUserId) {
+        const refreshedProfile = await profileService.getUserProfile(targetUserId)
+        setProfile(refreshedProfile)
+      }
+
       toast({
-        title: "Chức năng đang phát triển",
-        description: "Remove avatar sẽ được implement sau",
+        title: "Thành công",
+        description: "Đã xóa ảnh đại diện",
       })
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Failed to remove avatar:", error)
       toast({
         title: "Lỗi",
-        description: "Không thể xóa ảnh đại diện",
+        description: error.response?.data?.message || "Không thể xóa ảnh đại diện",
         variant: "destructive",
       })
+    } finally {
+      setIsUploadingAvatar(false)
     }
   }
 
@@ -171,27 +254,37 @@ export default function ProfilePage() {
               <div className="flex-shrink-0">
                 {profile?.isOwnProfile ? (
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                    <DropdownMenuTrigger asChild disabled={isUploadingAvatar}>
                       <div className="cursor-pointer group relative">
                         <Avatar className="w-[150px] h-[150px]">
-                          <AvatarImage src={profile?.user.avatarUrl || "/images/design-mode/image.png"} />
+                          <AvatarImage src={getAvatarUrl(profile?.user.avatarUrl)} />
                           <AvatarFallback>{profile?.user.displayName?.charAt(0).toUpperCase() || "JB"}</AvatarFallback>
                         </Avatar>
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-full flex items-center justify-center">
-                          <Camera className="w-8 h-8 text-white" />
-                        </div>
+                        {isUploadingAvatar ? (
+                          <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                          </div>
+                        ) : (
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-full flex items-center justify-center">
+                            <Camera className="w-8 h-8 text-white" />
+                          </div>
+                        )}
                       </div>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="w-56">
-                      <DropdownMenuItem onClick={handleAvatarUpdate} className="cursor-pointer">
+                      <DropdownMenuItem onClick={handleAvatarUpdate} className="cursor-pointer" disabled={isUploadingAvatar}>
                         <Camera className="mr-2 h-4 w-4" />
                         <span>Update photos</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleRemoveAvatar} className="cursor-pointer text-destructive">
+                      <DropdownMenuItem
+                        onClick={handleRemoveAvatar}
+                        className="cursor-pointer text-destructive"
+                        disabled={isUploadingAvatar || !profile?.user.avatarUrl}
+                      >
                         <Trash2 className="mr-2 h-4 w-4" />
                         <span>Remove current Photo</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="cursor-pointer">
+                      <DropdownMenuItem className="cursor-pointer" disabled={isUploadingAvatar}>
                         <X className="mr-2 h-4 w-4" />
                         <span>Cancel</span>
                       </DropdownMenuItem>
@@ -199,7 +292,7 @@ export default function ProfilePage() {
                   </DropdownMenu>
                 ) : (
                   <Avatar className="w-[150px] h-[150px]">
-                    <AvatarImage src={profile?.user.avatarUrl || "/images/design-mode/image.png"} />
+                    <AvatarImage src={getAvatarUrl(profile?.user.avatarUrl)} />
                     <AvatarFallback>{profile?.user.displayName?.charAt(0).toUpperCase() || "JB"}</AvatarFallback>
                   </Avatar>
                 )}
@@ -225,7 +318,7 @@ export default function ProfilePage() {
                         variant="secondary"
                         size="sm"
                         className="bg-secondary hover:bg-muted text-foreground h-8"
-                        onClick={() => router.push("/settings")}
+                        onClick={() => router.push("/settings?tab=account")}
                       >
                         Edit profile
                       </Button>
@@ -344,6 +437,14 @@ export default function ProfilePage() {
 
       {selectedPost && (
         <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} />
+      )}
+
+      {showCropModal && imageToCrop && (
+        <ImageCropModal
+          image={imageToCrop}
+          onComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+        />
       )}
     </div>
   )

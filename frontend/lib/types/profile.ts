@@ -26,7 +26,9 @@ export interface UserProfile {
 }
 
 export interface UpdateProfileData {
+  username?: string;
   displayName?: string;
+  email?: string;
   bio?: string;
 }
 

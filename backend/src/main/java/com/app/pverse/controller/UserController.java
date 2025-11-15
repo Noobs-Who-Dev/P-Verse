@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -97,5 +98,20 @@ public class UserController {
     ) {
         UserSettingsDto updated = settingsService.updateSettings(user.getId(), request);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật settings thành công", updated));
+    }
+
+    @PostMapping("/avatar")
+    public ResponseEntity<ApiResponse<UserDto>> uploadAvatar(
+            @AuthenticationPrincipal User user,
+            @RequestParam("file") MultipartFile file
+    ) {
+        UserDto updated = userService.updateAvatar(user.getId(), file);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật avatar thành công", updated));
+    }
+
+    @DeleteMapping("/avatar")
+    public ResponseEntity<ApiResponse<UserDto>> removeAvatar(@AuthenticationPrincipal User user) {
+        UserDto updated = userService.removeAvatar(user.getId());
+        return ResponseEntity.ok(ApiResponse.success("Xóa avatar thành công", updated));
     }
 }

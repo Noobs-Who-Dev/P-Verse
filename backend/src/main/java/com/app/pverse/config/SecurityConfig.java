@@ -93,6 +93,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()  // Public endpoints: login, register
+                .requestMatchers("/uploads/**").permitAll()   // Public access to uploaded files (avatars, etc.)
                 .anyRequest().authenticated()  // Tất cả các request khác phải đăng nhập
             )
             .authenticationProvider(authenticationProvider())

@@ -34,92 +34,92 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const initAuth = () => {
             console.log('[AuthProvider] Initializing auth...');
 
-            // Check if this is a fresh session (no sessionStorage flag)
-            const isActiveSession = sessionStorage.getItem('activeSession');
+            // Check if page was refreshed (not a new tab/window)
+            const wasRefreshed = sessionStorage.getItem('pageRefreshed');
 
-            if (!isActiveSession) {
-                // This is a new session (fresh browser/tab start)
-                console.log('[AuthProvider] New session detected, clearing old data');
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                localStorage.removeItem('loginTime');
-                document.cookie = 'auth-token=; path=/; max-age=0';
-                setIsLoading(false);
-                console.log('[AuthProvider] Initialization complete - fresh start');
-                return;
-            }
+            // Check sessionStorage first (per-tab storage)
+            const sessionToken = sessionStorage.getItem('token');
+            const sessionUser = sessionStorage.getItem('user');
 
-            // Check localStorage
+            // Check localStorage as backup (for refresh scenario)
             const storedToken = localStorage.getItem('token');
             const storedUser = localStorage.getItem('user');
             const loginTime = localStorage.getItem('loginTime');
 
-            // Check cookie
-            const cookieToken = document.cookie
-                .split('; ')
-                .find(row => row.startsWith('auth-token='))
-                ?.split('=')[1];
-
-            console.log('[AuthProvider] Auth data found:', {
+            console.log('[AuthProvider] Storage check:', {
+                hasSessionToken: !!sessionToken,
+                hasSessionUser: !!sessionUser,
                 hasLocalStorageToken: !!storedToken,
-                hasLocalStorageUser: !!storedUser,
-                hasCookie: !!cookieToken,
-                hasLoginTime: !!loginTime,
-                isActiveSession: !!isActiveSession
+                wasRefreshed: !!wasRefreshed
             });
 
-            if (storedToken && storedUser && loginTime) {
+            // Scenario 1: Fresh tab/window (not refresh)
+            // → No sessionStorage, but might have localStorage from previous session
+            // → Should LOGOUT (redirect to login)
+            if (!sessionToken && !wasRefreshed) {
+                console.log('[AuthProvider] New tab/window detected - logout required');
+                // Clear all auth data
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                localStorage.removeItem('loginTime');
+                sessionStorage.removeItem('token');
+                sessionStorage.removeItem('user');
+                document.cookie = 'auth-token=; path=/; max-age=0';
+
+                setUser(null);
+                setToken(null);
+                setIsLoading(false);
+                console.log('[AuthProvider] Not authenticated - will redirect to login');
+                return;
+            }
+
+            // Scenario 2: Page refresh (F5)
+            // → wasRefreshed flag exists, restore from localStorage
+            if (wasRefreshed && !sessionToken && storedToken && storedUser && loginTime) {
+                console.log('[AuthProvider] Page refreshed - restoring session');
+
                 try {
                     const parsedUser = JSON.parse(storedUser);
                     const loginTimestamp = parseInt(loginTime);
-                    const currentTime = Date.now();
-                    const tokenAge = currentTime - loginTimestamp;
-                    const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+                    const tokenAge = Date.now() - loginTimestamp;
+                    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
 
-                    console.log('[AuthProvider] Token age:', {
-                        loginTimestamp: new Date(loginTimestamp).toISOString(),
-                        currentTime: new Date(currentTime).toISOString(),
-                        ageInHours: (tokenAge / (60 * 60 * 1000)).toFixed(2),
-                        maxAgeInHours: 24
-                    });
-
-                    // Check if token is still fresh (within 24 hours)
                     if (tokenAge < maxAge) {
-                        // Token is fresh, restore session
+                        // Token still valid → Restore session
                         setToken(storedToken);
                         setUser(parsedUser);
 
-                        // Sync cookie if missing
-                        if (!cookieToken) {
-                            document.cookie = `auth-token=${storedToken}; path=/; max-age=86400; SameSite=Lax`;
-                        }
+                        // Restore to sessionStorage (for this tab)
+                        sessionStorage.setItem('token', storedToken);
+                        sessionStorage.setItem('user', storedUser);
 
-                        console.log('[AuthProvider] Token is fresh, user restored:', parsedUser.username);
+                        console.log('[AuthProvider] Session restored from localStorage');
                     } else {
-                        // Token is too old, clear session
-                        console.log('[AuthProvider] Token expired (older than 24h), clearing session');
+                        // Token expired
+                        console.log('[AuthProvider] Token expired, clearing session');
                         localStorage.removeItem('token');
                         localStorage.removeItem('user');
                         localStorage.removeItem('loginTime');
-                        document.cookie = 'auth-token=; path=/; max-age=0';
+                        setUser(null);
+                        setToken(null);
                     }
                 } catch (error) {
-                    console.error('[AuthProvider] Error during auth initialization:', error);
-                    // Clear corrupted data
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    localStorage.removeItem('loginTime');
-                    document.cookie = 'auth-token=; path=/; max-age=0';
+                    console.error('[AuthProvider] Error restoring session:', error);
+                    setUser(null);
+                    setToken(null);
                 }
-            } else {
-                console.log('[AuthProvider] No authenticated user found or missing loginTime');
-                // Clear partial data
-                if (storedToken || storedUser || loginTime) {
-                    console.log('[AuthProvider] Clearing incomplete session data');
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    localStorage.removeItem('loginTime');
-                    document.cookie = 'auth-token=; path=/; max-age=0';
+            }
+            // Scenario 3: Has sessionStorage (same tab, navigating)
+            else if (sessionToken && sessionUser) {
+                console.log('[AuthProvider] Session active in current tab');
+                try {
+                    const parsedUser = JSON.parse(sessionUser);
+                    setToken(sessionToken);
+                    setUser(parsedUser);
+                } catch (error) {
+                    console.error('[AuthProvider] Error parsing session data:', error);
+                    setUser(null);
+                    setToken(null);
                 }
             }
 
@@ -129,10 +129,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         initAuth();
 
-        // Set active session flag
-        sessionStorage.setItem('activeSession', 'true');
+        // Mark that page has been loaded (for refresh detection)
+        sessionStorage.setItem('pageRefreshed', 'true');
 
-        // No need for beforeunload event - sessionStorage auto-clears on tab/window close
+        // Clean up refresh flag on unload (when tab closes or navigates away)
+        const handleBeforeUnload = () => {
+            // Don't remove the flag - it will be auto-cleared when tab closes
+            // This allows refresh detection to work
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, []);
 
     const login = async (username: string, password: string) => {
@@ -150,18 +157,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await response.json();
         const { accessToken, userId, username: userName, email, displayName, avatarUrl } = data.data;
 
-        // Lưu vào state
-        setToken(accessToken);
-        setUser({ id: userId, username: userName, email, displayName, avatarUrl });
-
-        // Lưu vào localStorage với timestamp
+        const userData = { id: userId, username: userName, email, displayName, avatarUrl };
+        const userDataString = JSON.stringify(userData);
         const loginTime = Date.now();
+
+        // Lưu vào localStorage (backup for refresh)
         localStorage.setItem('token', accessToken);
-        localStorage.setItem('user', JSON.stringify({ id: userId, username: userName, email, displayName, avatarUrl }));
+        localStorage.setItem('user', userDataString);
         localStorage.setItem('loginTime', loginTime.toString());
 
-        // Lưu vào cookie để middleware có thể check
+        // Lưu vào sessionStorage (primary storage - cleared when tab closes)
+        sessionStorage.setItem('token', accessToken);
+        sessionStorage.setItem('user', userDataString);
+        sessionStorage.setItem('pageRefreshed', 'true'); // Mark as active session
+
+        // Lưu vào cookie
         document.cookie = `auth-token=${accessToken}; path=/; max-age=86400; SameSite=Lax`;
+
+        // Lưu vào state
+        setToken(accessToken);
+        setUser(userData);
 
         console.log('[AuthProvider] Login successful at:', new Date(loginTime).toISOString());
 
@@ -184,18 +199,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await response.json();
         const { accessToken, userId, username: userName, email: userEmail, displayName: userDisplayName, avatarUrl } = data.data;
 
-        // Auto login
-        setToken(accessToken);
-        setUser({ id: userId, username: userName, email: userEmail, displayName: userDisplayName, avatarUrl });
-
-        // Lưu vào localStorage với timestamp
+        const userData = { id: userId, username: userName, email: userEmail, displayName: userDisplayName, avatarUrl };
+        const userDataString = JSON.stringify(userData);
         const loginTime = Date.now();
+
+        // Lưu vào localStorage (backup for refresh)
         localStorage.setItem('token', accessToken);
-        localStorage.setItem('user', JSON.stringify({ id: userId, username: userName, email: userEmail, displayName: userDisplayName, avatarUrl }));
+        localStorage.setItem('user', userDataString);
         localStorage.setItem('loginTime', loginTime.toString());
+
+        // Lưu vào sessionStorage (primary storage - cleared when tab closes)
+        sessionStorage.setItem('token', accessToken);
+        sessionStorage.setItem('user', userDataString);
+        sessionStorage.setItem('pageRefreshed', 'true'); // Mark as active session
 
         // Lưu vào cookie
         document.cookie = `auth-token=${accessToken}; path=/; max-age=86400; SameSite=Lax`;
+
+        // Auto login - Set state
+        setToken(accessToken);
+        setUser(userData);
 
         console.log('[AuthProvider] Registration successful at:', new Date(loginTime).toISOString());
 
@@ -205,12 +228,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const logout = () => {
         setUser(null);
         setToken(null);
+
+        // Clear localStorage
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('loginTime');
 
+        // Clear sessionStorage
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        sessionStorage.removeItem('pageRefreshed');
+
         // Xóa cookie
         document.cookie = 'auth-token=; path=/; max-age=0';
+
 
         console.log('[AuthProvider] Logout, redirecting to /login');
         router.push('/login');
