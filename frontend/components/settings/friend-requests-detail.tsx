@@ -25,6 +25,8 @@ export function FriendRequestsDetail({ onBack }: FriendRequestsDetailProps) {
     setIsLoading(true)
     try {
       const data = await getReceivedRequests()
+      console.log('[FriendRequestsDetail] Loaded requests from API:', data)
+      console.log('[FriendRequestsDetail] Number of requests:', data.length)
       setRequests(data)
     } catch (error) {
       console.error("Error loading requests:", error)

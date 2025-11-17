@@ -35,12 +35,8 @@ const reactionEmojis: Record<string, string> = {
 export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const mockReactions: Reaction[] = post.reactions || [
-    { username: "john_doe", reaction: "love" },
-    { username: "jane_smith", reaction: "like" },
-    { username: "mike_chen", reaction: "haha" },
-    { username: "sarah_lee", reaction: "love" },
-  ]
+  // Use real reactions from post, empty array if none
+  const reactions: Reaction[] = post.reactions || []
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`)
@@ -126,20 +122,24 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
             {/* Reactions section */}
             <div className="px-4 py-4 border-b border-border flex-1 overflow-y-auto">
               <div className="mb-3">
-                <p className="text-xs font-semibold text-muted-foreground mb-2">{mockReactions.length} REACTIONS</p>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">{reactions.length} REACTIONS</p>
               </div>
 
               <div className="space-y-2">
-                {mockReactions.map((item, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <Avatar className="w-6 h-6">
-                      <AvatarImage src={`/images/design-mode/image.png`} />
-                      <AvatarFallback>{item.username[0].toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm text-foreground flex-1">{item.username}</span>
-                    <span className="text-lg">{reactionEmojis[item.reaction] || "👍"}</span>
-                  </div>
-                ))}
+                {reactions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No reactions yet</p>
+                ) : (
+                  reactions.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Avatar className="w-6 h-6">
+                        <AvatarImage src={`/images/design-mode/image.png`} />
+                        <AvatarFallback>{item.username[0].toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm text-foreground flex-1">{item.username}</span>
+                      <span className="text-lg">{reactionEmojis[item.reaction] || "👍"}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 

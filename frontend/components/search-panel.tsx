@@ -134,6 +134,13 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
     const isLoading = isUpdatingFriend[user.id]
     const status = user.friendshipStatus
 
+    // Debug logging
+    console.log(`[SearchPanel] User ${user.username} (ID: ${user.id}):`, {
+      status,
+      displayName: user.displayName,
+      friendshipStatus: user.friendshipStatus
+    });
+
     // Already friends - show Message button
     if (status === "FRIEND") {
       return (

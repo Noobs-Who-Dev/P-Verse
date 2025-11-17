@@ -42,13 +42,7 @@ public class FriendController {
     @GetMapping("/search")
     public ResponseEntity<List<UserSearchDto>> searchUsers(
             @RequestParam String keyword,
-            @RequestAttribute(value = "userId", required = false) Long viewerId) {  // ← required = false
-
-        // Default userId for testing (no JWT)
-        if (viewerId == null) {
-            viewerId = 3L;
-            log.info("No userId attribute, using default: 1");
-        }
+            @RequestAttribute(value = "userId", required = true) Long viewerId) {
 
         log.info("Search users API called: keyword={}, viewerId={}", keyword, viewerId);
 
@@ -74,11 +68,7 @@ public class FriendController {
     @PostMapping("/request")
     public ResponseEntity<Map<String, Object>> toggleFriendRequest(
             @Valid @RequestBody FriendRequestDto request,
-            @RequestAttribute(value = "userId", required = false) Long viewerId) {  // ← required = false
-
-        if (viewerId == null) {
-            viewerId = 3L;
-        }
+            @RequestAttribute(value = "userId", required = true) Long viewerId) {
 
         log.info("Toggle friend request API: viewer={}, target={}",
                 viewerId, request.getTargetUserId());
@@ -113,11 +103,7 @@ public class FriendController {
     @DeleteMapping("/{targetUserId}")
     public ResponseEntity<Map<String, Object>> unfriend(
             @PathVariable Long targetUserId,
-            @RequestAttribute(value = "userId", required = false) Long viewerId) {  // ← required = false
-
-        if (viewerId == null) {
-            viewerId = 3L;
-        }
+            @RequestAttribute(value = "userId", required = true) Long viewerId) {
 
         log.info("Unfriend API: viewer={}, target={}", viewerId, targetUserId);
 
@@ -145,11 +131,7 @@ public class FriendController {
      */
     @GetMapping
     public ResponseEntity<List<UserSearchDto>> getFriends(
-            @RequestAttribute(value = "userId", required = false) Long userId) {  // ← required = false
-
-        if (userId == null) {
-            userId = 3L;
-        }
+            @RequestAttribute(value = "userId", required = true) Long userId) {
 
         log.info("Get friends list API: userId={}", userId);
 
@@ -168,11 +150,7 @@ public class FriendController {
      */
     @GetMapping("/requests/received")
     public ResponseEntity<List<UserSearchDto>> getReceivedRequests(
-            @RequestAttribute(value = "userId", required = false) Long userId) {  // ← required = false
-
-        if (userId == null) {
-            userId = 3L;
-        }
+            @RequestAttribute(value = "userId", required = true) Long userId) {
 
         log.info("Get received requests API: userId={}", userId);
 
@@ -191,11 +169,7 @@ public class FriendController {
      */
     @GetMapping("/requests/sent")
     public ResponseEntity<List<UserSearchDto>> getSentRequests(
-            @RequestAttribute(value = "userId", required = false) Long userId) {  // ← required = false
-
-        if (userId == null) {
-            userId = 3L;
-        }
+            @RequestAttribute(value = "userId", required = true) Long userId) {
 
         log.info("Get sent requests API: userId={}", userId);
 

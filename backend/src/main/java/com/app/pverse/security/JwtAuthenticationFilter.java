@@ -38,6 +38,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Lấy username từ token
                 String username = tokenProvider.getUsernameFromToken(jwt);
 
+                // ✅ Lấy userId từ token
+                Long userId = tokenProvider.getUserIdFromToken(jwt);
+
                 // Load user details
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
@@ -54,7 +57,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Set authentication vào SecurityContext
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                log.debug("Set authentication for user: {}", username);
+                // ✅ Set userId vào request attribute để controller có thể sử dụng
+                request.setAttribute("userId", userId);
+
+                log.debug("Set authentication for user: {} (ID: {})", username, userId);
             }
         } catch (Exception ex) {
             log.error("Could not set user authentication in security context", ex);

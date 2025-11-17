@@ -56,6 +56,9 @@ import { settingsService } from '@/app/(protected)/services/settingsService';
 import { profileService } from '@/lib/services/profileService';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/lib/auth/authContext';
+import { FriendsListDetail } from '@/components/settings/friends-list-detail';
+import { FriendRequestsDetail } from '@/components/settings/friend-requests-detail';
+import { SentRequestsDetail } from '@/components/settings/sent-requests-detail';
 
 const settingsCategories = [
   {
@@ -206,64 +209,6 @@ export default function SettingsPage() {
     confirmPassword: "",
   })
   const [isChangingPassword, setIsChangingPassword] = useState(false)
-
-  const mockDevices = [
-    {
-      id: "1",
-      name: "Windows PC",
-      location: "Ho Chi Minh City, Vietnam",
-      lastActive: "Active now",
-      current: true,
-    },
-    {
-      id: "2",
-      name: "iPhone 14 Pro",
-      location: "Ho Chi Minh City, Vietnam",
-      lastActive: "2 hours ago",
-      current: false,
-    },
-    {
-      id: "3",
-      name: "MacBook Pro",
-      location: "Hanoi, Vietnam",
-      lastActive: "1 day ago",
-      current: false,
-    },
-  ]
-
-  const mockFriends = [
-    { id: "1", username: "sarah.johnson", name: "Sarah Johnson", avatar: "/woman-profile.jpg" },
-    { id: "2", username: "mike.chen", name: "Mike Chen", avatar: "/asian-man-profile.jpg" },
-    { id: "3", username: "emma.wilson", name: "Emma Wilson", avatar: "/blonde-woman-profile.jpg" },
-    { id: "4", username: "james.brown", name: "James Brown", avatar: "/black-man-profile.jpg" },
-    { id: "5", username: "olivia.davis", name: "Olivia Davis", avatar: "/redhead-woman-profile.jpg" },
-    { id: "6", username: "alex.martinez", name: "Alex Martinez", avatar: "/latino-man-profile.jpg" },
-    { id: "7", username: "sophia.lee", name: "Sophia Lee", avatar: "/korean-woman-profile.jpg" },
-    { id: "8", username: "daniel.kim", name: "Daniel Kim", avatar: "/korean-man-profile.jpg" },
-  ]
-
-  const mockFriendRequests = [
-    {
-      id: "1",
-      username: "jessica.taylor",
-      name: "Jessica Taylor",
-      avatar: "/brunette-woman-profile.jpg",
-      mutualFriends: 5,
-    },
-    {
-      id: "2",
-      username: "ryan.anderson",
-      name: "Ryan Anderson",
-      avatar: "/bearded-man-profile.jpg",
-      mutualFriends: 3,
-    },
-    { id: "3", username: "mia.garcia", name: "Mia Garcia", avatar: "/latina-woman-profile.jpg", mutualFriends: 8 },
-  ]
-
-  const mockBlockedUsers = [
-    { id: "1", username: "spam.account", name: "Spam Account", avatar: "/generic-profile.jpg" },
-    { id: "2", username: "toxic.user", name: "Toxic User", avatar: "/anonymous-profile.jpg" },
-  ]
 
   // Load settings from backend
   useEffect(() => {
@@ -881,124 +826,10 @@ export default function SettingsPage() {
     )
   }
 
-  const renderFriendsListDetail = () => {
-    const filteredFriends = mockFriends.filter(
-      (friend) =>
-        friend.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        friend.name.toLowerCase().includes(searchQuery.toLowerCase()),
-    )
-
-    return (
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <button onClick={() => setDetailView(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-          <h2 className="text-2xl font-semibold">Friends List</h2>
-        </div>
-
-        {/* Search */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-secondary border-none"
-          />
-        </div>
-
-        {/* Friends List */}
-        <div className="flex-1 overflow-y-auto space-y-2">
-          {filteredFriends.map((friend) => (
-            <div
-              key={friend.id}
-              className="flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={friend.avatar || "/placeholder.svg"} alt={friend.name} />
-                  <AvatarFallback>{friend.name[0]}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-medium">{friend.username}</div>
-                  <div className="text-sm text-muted-foreground">{friend.name}</div>
-                </div>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="p-2 hover:bg-secondary rounded-full transition-colors">
-                    <MoreVertical className="w-5 h-5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-card border-border">
-                  <DropdownMenuItem className="hover:bg-muted cursor-pointer">
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    Message
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="hover:bg-muted cursor-pointer">
-                    <UserMinus className="w-4 h-4 mr-2" />
-                    Unfriend
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="text-red-500 hover:bg-muted cursor-pointer">
-                    <Ban className="w-4 h-4 mr-2" />
-                    Block
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  const renderFriendRequestsDetail = () => {
-    return (
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <button onClick={() => setDetailView(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-          <h2 className="text-2xl font-semibold">Friend Requests</h2>
-        </div>
-
-        {/* Friend Requests List */}
-        <div className="flex-1 overflow-y-auto space-y-4">
-          {mockFriendRequests.map((request) => (
-            <div key={request.id} className="p-4 border border-border rounded-xl bg-card">
-              <div className="flex items-start gap-3 mb-4">
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={request.avatar || "/placeholder.svg"} alt={request.name} />
-                  <AvatarFallback>{request.name[0]}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <div className="font-medium">{request.username}</div>
-                  <div className="text-sm text-muted-foreground">{request.name}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{request.mutualFriends} mutual friends</div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button className="flex-1 bg-[#0095f6] hover:bg-[#0095f6]/90">
-                  <UserCheck className="w-4 h-4 mr-2" />
-                  Accept
-                </Button>
-                <Button variant="outline" className="flex-1 border-border hover:bg-muted bg-transparent">
-                  <UserX className="w-4 h-4 mr-2" />
-                  Decline
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
   const renderBlockedUsersDetail = () => {
+    // TODO: Implement blocked users API
+    const blockedUsers: any[] = []; // Replace with API call later
+
     return (
       <div className="h-full flex flex-col">
         {/* Header */}
@@ -1011,27 +842,33 @@ export default function SettingsPage() {
 
         {/* Blocked Users List */}
         <div className="flex-1 overflow-y-auto space-y-2">
-          {mockBlockedUsers.map((user) => (
-            <div
-              key={user.id}
-              className="flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-                  <AvatarFallback>{user.name[0]}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-medium">{user.username}</div>
-                  <div className="text-sm text-muted-foreground">{user.name}</div>
-                </div>
-              </div>
-              <Button variant="outline" size="sm" className="border-border hover:bg-muted bg-transparent">
-                <X className="w-4 h-4 mr-2" />
-                Unblock
-              </Button>
+          {blockedUsers.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No blocked users</p>
             </div>
-          ))}
+          ) : (
+            blockedUsers.map((user) => (
+              <div
+                key={user.id}
+                className="flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Avatar className="w-12 h-12">
+                    <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                    <AvatarFallback>{user.name[0]}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="font-medium">{user.username}</div>
+                    <div className="text-sm text-muted-foreground">{user.name}</div>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" className="border-border hover:bg-muted bg-transparent">
+                  <X className="w-4 h-4 mr-2" />
+                  Unblock
+                </Button>
+              </div>
+            ))
+          )}
         </div>
       </div>
     )
@@ -1062,6 +899,17 @@ export default function SettingsPage() {
             <div className="flex-1 text-left">
               <h4 className="text-base font-medium mb-1">Pending Friend Requests</h4>
               <p className="text-sm text-muted-foreground">View and manage incoming friend requests.</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
+          </button>
+
+          <button
+            onClick={() => setDetailView("sent-requests")}
+            className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-muted transition-colors border border-border"
+          >
+            <div className="flex-1 text-left">
+              <h4 className="text-base font-medium mb-1">Sent Friend Requests</h4>
+              <p className="text-sm text-muted-foreground">View and manage your sent friend requests.</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
           </button>
@@ -1391,6 +1239,9 @@ export default function SettingsPage() {
   }
 
   const renderDeviceManagementDetail = () => {
+    // TODO: Implement device management API
+    const devices: any[] = []; // Replace with API call later
+
     return (
       <div className="h-full flex flex-col">
         {/* Header */}
@@ -1407,30 +1258,36 @@ export default function SettingsPage() {
 
         {/* Devices List */}
         <div className="flex-1 overflow-y-auto space-y-4">
-          {mockDevices.map((device) => (
-            <div key={device.id} className="p-4 border border-border rounded-xl bg-card">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-start gap-3">
-                  <Smartphone className="w-5 h-5 text-muted-foreground mt-1" />
-                  <div>
-                    <div className="font-medium flex items-center gap-2">
-                      {device.name}
-                      {device.current && (
-                        <span className="text-xs bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full">Current</span>
-                      )}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">{device.location}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{device.lastActive}</div>
-                  </div>
-                </div>
-                {!device.current && (
-                  <Button variant="outline" size="sm" className="border-border hover:bg-muted bg-transparent">
-                    Log Out
-                  </Button>
-                )}
-              </div>
+          {devices.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No devices found. Device management feature coming soon.</p>
             </div>
-          ))}
+          ) : (
+            devices.map((device) => (
+              <div key={device.id} className="p-4 border border-border rounded-xl bg-card">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start gap-3">
+                    <Smartphone className="w-5 h-5 text-muted-foreground mt-1" />
+                    <div>
+                      <div className="font-medium flex items-center gap-2">
+                        {device.name}
+                        {device.current && (
+                          <span className="text-xs bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full">Current</span>
+                        )}
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-1">{device.location}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{device.lastActive}</div>
+                    </div>
+                  </div>
+                  {!device.current && (
+                    <Button variant="outline" size="sm" className="border-border hover:bg-muted bg-transparent">
+                      Log Out
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     )
@@ -1841,10 +1698,13 @@ export default function SettingsPage() {
 
   const renderSettingsContent = () => {
     if (detailView === "friends-list") {
-      return renderFriendsListDetail()
+      return <FriendsListDetail searchQuery={searchQuery} setSearchQuery={setSearchQuery} onBack={() => setDetailView(null)} />
     }
     if (detailView === "friend-requests") {
-      return renderFriendRequestsDetail()
+      return <FriendRequestsDetail onBack={() => setDetailView(null)} />
+    }
+    if (detailView === "sent-requests") {
+      return <SentRequestsDetail onBack={() => setDetailView(null)} />
     }
     if (detailView === "blocked-users") {
       return renderBlockedUsersDetail()
@@ -1896,13 +1756,7 @@ export default function SettingsPage() {
         {activePanel === "search" && <SearchPanel onClose={handleClosePanel} />}
         {activePanel === "notifications" && <NotificationsPanel onClose={handleClosePanel} />}
 
-        {activePanel && (
-          <div
-            className="fixed inset-0 bg-black/20 z-30"
-            style={{ marginLeft: sidebarCollapsed ? "73px" : "245px" }}
-            onClick={handleClosePanel}
-          />
-        )}
+        {/* No overlay in settings page - search panel should be fully usable */}
 
         <main className={`flex-1 ${sidebarCollapsed ? "ml-[73px]" : "ml-[245px]"} transition-all duration-300`}>
           <div className="flex h-screen">

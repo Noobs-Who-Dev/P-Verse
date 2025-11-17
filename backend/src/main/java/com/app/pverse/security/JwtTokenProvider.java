@@ -1,5 +1,6 @@
 package com.app.pverse.security;
 
+import com.app.pverse.entity.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
@@ -32,8 +33,15 @@ public class JwtTokenProvider {
 
         SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
 
+        // ✅ Lấy userId từ User entity
+        Long userId = null;
+        if (userDetails instanceof User) {
+            userId = ((User) userDetails).getId();
+        }
+
         return Jwts.builder()
                 .subject(userDetails.getUsername())  // Username
+                .claim("userId", userId)             // ✅ Thêm userId vào claims
                 .issuedAt(now)                       // Thời gian tạo
                 .expiration(expiryDate)              // Thời gian hết hạn
                 .signWith(key)                       // Ký bằng secret key
@@ -53,6 +61,28 @@ public class JwtTokenProvider {
                 .getPayload();
 
         return claims.getSubject();
+    }
+
+    /**
+     * ✅ Lấy userId từ JWT token
+     */
+    public Long getUserIdFromToken(String token) {
+        SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        // Lấy userId từ claims
+        Object userIdObj = claims.get("userId");
+        if (userIdObj instanceof Integer) {
+            return ((Integer) userIdObj).longValue();
+        } else if (userIdObj instanceof Long) {
+            return (Long) userIdObj;
+        }
+        return null;
     }
 
     /**
@@ -82,3 +112,4 @@ public class JwtTokenProvider {
         return false;
     }
 }
+
