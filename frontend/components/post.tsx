@@ -7,7 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useState, useEffect } from "react"
 import { PhotoEditModal } from "./photo-edit-modal"
 import { useToast } from "@/hooks/use-toast"
-import { addMomentReaction, getMyReaction, type ReactionType } from "@/lib/api"
+import { addMomentReaction, getMyReaction, getRecentReactions, type ReactionType } from "@/lib/api"
+import { ActivityModal } from "./activity-modal"
 
 interface PostProps {
   id?: string
@@ -22,6 +23,10 @@ interface PostProps {
   timeAgo: string
   status?: string
   isOnline?: boolean
+  // NEW PROPS
+  isOwner?: boolean              // Detect if current user owns the post
+  allowJoinIn?: boolean          // Show "Join in" button
+  onActivityClick?: () => void   // Handler for Activity button
   onSendToFriends?: () => void
 }
 
@@ -47,6 +52,9 @@ export function Post({
   timeAgo,
   status,
   isOnline,
+  isOwner = false,           // NEW: Default false
+  allowJoinIn = false,       // NEW: Default false
+  onActivityClick,           // NEW: Activity handler
   onSendToFriends,
 }: PostProps) {
   const [selectedReaction, setSelectedReaction] = useState<number | null>(null)
@@ -54,12 +62,29 @@ export function Post({
   const [isReactionOpen, setIsReactionOpen] = useState(false)
   const [isJoinedIn, setIsJoinedIn] = useState(false)
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
+  const [isActivityOpen, setIsActivityOpen] = useState(false)
   const [messageInput, setMessageInput] = useState("")
   const [isSaved, setIsSaved] = useState(false)
   const [reactionCount, setReactionCount] = useState(likes || 0)
   const [isReacting, setIsReacting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [recentReactors, setRecentReactors] = useState<Array<{
+    userId: number;
+    username: string;
+    avatarUrl: string;
+    reactionType: ReactionType;
+    createdAt: string;
+  }>>([])
   const { toast } = useToast()
+
+  // Debug: Log isOwner prop
+  console.log('🎨 [Post] Rendering:', {
+    id,
+    username,
+    isOwner,
+    allowJoinIn,
+    hasActivityHandler: !!onActivityClick
+  })
 
   // Map frontend reaction index to backend ReactionType
   const reactionTypeMap = ['LIKE', 'LOVE', 'HAHA', 'WOW', 'SAD', 'ANGRY']
@@ -103,6 +128,27 @@ export function Post({
       loadMyReaction()
     }
   }, [id])
+
+  // Load recent reactions for Activity button (only for owner)
+  const loadRecentReactions = async () => {
+    if (!id || !isOwner) return
+
+    try {
+      const result = await getRecentReactions(Number(id))
+      setRecentReactors(result.reactors || [])
+      console.log('✅ Loaded recent reactions:', result.count)
+    } catch (error: any) {
+      console.error('⚠️ Could not load recent reactions:', error.message || error)
+      setRecentReactors([])
+    }
+  }
+
+  // Load recent reactions when component mounts (for owner only)
+  useEffect(() => {
+    if (id && isOwner) {
+      loadRecentReactions()
+    }
+  }, [id, isOwner])
 
   const handleReactionClick = async (index: number) => {
     if (!id || isReacting) return
@@ -181,6 +227,14 @@ export function Post({
 
   const SelectedReactionIcon = selectedReaction !== null ? reactions[selectedReaction].icon : Heart
   const selectedReactionColor = selectedReaction !== null ? reactions[selectedReaction].color : "currentColor"
+
+  // Helper function to get avatar URL
+  const getAvatarUrl = (avatarUrl: string | null) => {
+    if (!avatarUrl) return "/placeholder-user.jpg"
+    if (avatarUrl.startsWith('http')) return avatarUrl
+    const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${cleanPath}`
+  }
 
   return (
     <>
@@ -312,83 +366,117 @@ export function Post({
         <div className="px-4 h-12"></div>
 
         <div className="border-t border-border px-4 py-3">
-          <div className="flex items-stretch gap-3">
-            {/* Send message input - takes 5/6 width */}
-            <div className="flex-[5] flex items-center gap-3 bg-muted rounded-full px-4 h-12">
-              <input
-                type="text"
-                placeholder="Send message..."
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-              />
-              <div className="flex items-center gap-2">
-                {/* Edit photo icon */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 hover:bg-secondary"
-                  onClick={() => setIsEditModalOpen(true)}
-                  title="Edit photo"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="w-5 h-5 scale-150"
-                  >
-                    <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
-                    <path d="m15 5 4 4" />
-                  </svg>
-                </Button>
+          <div className="flex items-center justify-center">
+            {(() => {
+              console.log('🎯 [Post Bottom] Rendering bottom section for:', username, 'isOwner:', isOwner)
+              return null
+            })()}
 
-                {/* Emoji picker button - stays as button icon */}
-                <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
-                  <PopoverTrigger asChild>
+            {/* CASE 1: Owner's post → Show Activity button */}
+            {isOwner ? (
+              <Button
+                onClick={onActivityClick || (() => setIsActivityOpen(true))}
+                variant="ghost"
+                className="h-12 px-4 rounded-full hover:bg-muted flex items-center gap-2 w-fit"
+              >
+                <span className="text-sm font-medium">✨ Activity</span>
+                <div className="flex -space-x-2">
+                  {/* Show avatars of recent reactors or "No recent activity" text */}
+                  {recentReactors.length > 0 ? (
+                    recentReactors.slice(0, 5).map((reactor, index) => (
+                      <Avatar key={reactor.userId} className="w-6 h-6 border border-background">
+                        <AvatarImage src={getAvatarUrl(reactor.avatarUrl)} />
+                        <AvatarFallback>{reactor.username[0].toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground ml-2">
+                      No recent activity
+                    </span>
+                  )}
+                </div>
+              </Button>
+            ) : (
+              /* CASE 2: Other's post → Show message input + optional Join in */
+              <div className="flex items-stretch gap-3 w-full">
+                {/* Send message input */}
+                <div className="flex-[5] flex items-center gap-3 bg-muted rounded-full px-4 h-12">
+                  <input
+                    type="text"
+                    placeholder="Send message..."
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+                  />
+                  <div className="flex items-center gap-2">
+                    {/* Edit photo icon */}
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 hover:bg-secondary relative"
-                      title="Add emoji"
+                      className="h-8 w-8 hover:bg-secondary"
+                      onClick={() => setIsEditModalOpen(true)}
+                      title="Edit photo"
                     >
-                      <Smile className="w-5 h-5 scale-150" />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-5 h-5 scale-150"
+                      >
+                        <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+                        <path d="m15 5 4 4" />
+                      </svg>
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent side="top" className="w-auto p-3 bg-card border-border">
-                    <div className="grid grid-cols-6 gap-2">
-                      {emojis.map((emoji, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handleEmojiSelect(emoji)}
-                          className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-muted transition-colors text-2xl"
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
 
-            {/* Join in button - takes 1/6 width, full height with text */}
-            {username === "mike_chen" && (
-              <Button
-                variant="ghost"
-                onClick={() => setIsJoinedIn(!isJoinedIn)}
-                className={`flex-1 rounded-full h-12 transition-all flex items-center justify-center ${
-                  isJoinedIn
-                    ? "bg-muted text-muted-foreground hover:bg-secondary"
-                    : "bg-gradient-to-r from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] text-white hover:opacity-90"
-                }`}
-                title="Join in"
-              >
-                <span className="text-sm font-medium">Join in</span>
-              </Button>
+                    {/* Emoji picker */}
+                    <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:bg-secondary relative"
+                          title="Add emoji"
+                        >
+                          <Smile className="w-5 h-5 scale-150" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent side="top" className="w-auto p-3 bg-card border-border">
+                        <div className="grid grid-cols-6 gap-2">
+                          {emojis.map((emoji, index) => (
+                            <button
+                              key={index}
+                              onClick={() => handleEmojiSelect(emoji)}
+                              className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-muted transition-colors text-2xl"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                {/* Join in button (conditional) */}
+                {allowJoinIn && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => setIsJoinedIn(!isJoinedIn)}
+                    className={`flex-1 rounded-full h-12 transition-all flex items-center justify-center ${
+                      isJoinedIn
+                        ? "bg-muted text-muted-foreground hover:bg-secondary"
+                        : "bg-gradient-to-r from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] text-white hover:opacity-90"
+                    }`}
+                    title="Join in"
+                  >
+                    <span className="text-sm font-medium">Join in</span>
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -401,6 +489,14 @@ export function Post({
         imageUrl={image}
         username={username}
         userAvatar={userAvatar}
+      />
+
+      {/* Activity Modal */}
+      <ActivityModal
+        isOpen={isActivityOpen}
+        onClose={() => setIsActivityOpen(false)}
+        username={username}
+        momentId={id ? Number(id) : undefined}
       />
     </>
   )

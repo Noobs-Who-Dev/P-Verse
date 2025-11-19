@@ -26,8 +26,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -377,8 +379,15 @@ public class MomentService {
 
     /**
      * Convert Moment entity to MomentResponseDTO
+     * Includes reaction info for current user
      */
     private MomentResponseDTO toResponseDTO(Moment moment, Long currentUserId) {
+        // Get total reaction count for this moment
+        Long reactionCount = momentReactionRepository.countByMomentId(moment.getId());
+
+        // Check if current user has reacted and get their reaction type
+        var userReaction = momentReactionRepository.findByMomentIdAndUserId(moment.getId(), currentUserId);
+
         return MomentResponseDTO.builder()
                 .id(moment.getId())
                 .user(toUserSummaryDTO(moment.getUser()))
@@ -388,9 +397,9 @@ public class MomentService {
                 .specificUser(moment.getSpecificUser() != null ? toUserSummaryDTO(moment.getSpecificUser()) : null)
                 .createdAt(moment.getCreatedAt())
                 .timeAgo(calculateTimeAgo(moment.getCreatedAt()))
-                .reactionCount(0L) // TODO: Implement reaction count when reaction feature is added
-                .hasReacted(false) // TODO: Implement hasReacted when reaction feature is added
-                .reactionType(null) // TODO: Implement when reaction feature is added
+                .reactionCount(reactionCount)
+                .hasReacted(userReaction.isPresent())
+                .reactionType(userReaction.map(r -> r.getReactionType().name()).orElse(null))
                 .build();
     }
 
@@ -599,5 +608,92 @@ public class MomentService {
 
         return false;
     }
-}
 
+    /**
+     * Get recent reactions for a moment (for Activity button)
+     * Returns up to 5 most recent reactions with user avatars
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getRecentReactions(Long momentId) {
+        log.info("📋 getRecentReactions: momentId={}", momentId);
+
+        // Get up to 5 most recent reactions
+        var reactions = momentReactionRepository.findTop5ByMomentIdOrderByCreatedAtDesc(momentId);
+
+        List<Map<String, ? extends Serializable>> recentReactors = reactions.stream()
+                .map(reaction -> Map.of(
+                        "userId", reaction.getUser().getId(),
+                        "username", reaction.getUser().getUsername(),
+                        "avatarUrl", reaction.getUser().getAvatarUrl(),
+                        "reactionType", reaction.getReactionType().name(),
+                        "createdAt", reaction.getCreatedAt()
+                ))
+                .collect(Collectors.toList());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("count", recentReactors.size());
+        result.put("reactors", recentReactors);
+
+        log.info("✅ Found {} recent reactions", recentReactors.size());
+        return result;
+    }
+
+    /**
+     * Get activity data for a moment (views and reactions)
+     * Views: Temporarily use reactors as viewers
+     * Reactions: All reactions with details
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getMomentActivity(Long momentId) {
+        log.info("📋 getMomentActivity: momentId={}", momentId);
+
+        // Get all reactions for this moment
+        var reactions = momentReactionRepository.findByMomentIdOrderByCreatedAtDesc(momentId);
+
+        // For now, viewers = reactors (people who reacted are considered viewers)
+        List<Map<String, ? extends Serializable>> viewers = reactions.stream()
+                .map(reaction -> Map.of(
+                        "userId", reaction.getUser().getId(),
+                        "username", reaction.getUser().getUsername(),
+                        "avatarUrl", reaction.getUser().getAvatarUrl(),
+                        "viewedAt", reaction.getCreatedAt()
+                ))
+                .collect(Collectors.toList());
+
+        // Reactions with details
+        List<Map<String, ? extends Serializable>> reactionDetails = reactions.stream()
+                .map(reaction -> Map.of(
+                        "userId", reaction.getUser().getId(),
+                        "username", reaction.getUser().getUsername(),
+                        "avatarUrl", reaction.getUser().getAvatarUrl(),
+                        "reactionType", reaction.getReactionType().name(),
+                        "emoji", getReactionEmoji(reaction.getReactionType()),
+                        "reactedAt", reaction.getCreatedAt()
+                ))
+                .collect(Collectors.toList());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("viewers", viewers);
+        result.put("reactions", reactionDetails);
+        result.put("totalViews", viewers.size());
+        result.put("totalReactions", reactionDetails.size());
+
+        log.info("✅ Found {} viewers and {} reactions", viewers.size(), reactionDetails.size());
+        return result;
+    }
+
+    /**
+     * Get emoji representation for reaction type
+     */
+    private String getReactionEmoji(MomentReaction.ReactionType reactionType) {
+        switch (reactionType) {
+            case LIKE: return "👍";
+            case LOVE: return "❤️";
+            case HAHA: return "😂";
+            case WOW: return "😮";
+            case SAD: return "😢";
+            case ANGRY: return "😠";
+            default: return "👍";
+        }
+    }
+}

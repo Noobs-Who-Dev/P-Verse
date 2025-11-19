@@ -119,5 +119,48 @@ public class MomentReactionController {
                     .body(ApiResponse.error("Failed to remove reaction: " + e.getMessage()));
         }
     }
-}
 
+    /**
+     * Get recent reactions for a moment (for Activity button)
+     * GET /api/moments/{momentId}/reactions/recent
+     */
+    @GetMapping("/{momentId}/reactions/recent")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getRecentReactions(
+            @PathVariable Long momentId,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        log.info("📋 GET /api/moments/{}/reactions/recent", momentId);
+
+        try {
+            Map<String, Object> result = momentService.getRecentReactions(momentId);
+            return ResponseEntity.ok(ApiResponse.success(result));
+
+        } catch (Exception e) {
+            log.error("❌ Error getting recent reactions", e);
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Failed to get recent reactions: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Get activity data for a moment (views and reactions)
+     * GET /api/moments/{momentId}/activity
+     */
+    @GetMapping("/{momentId}/activity")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getMomentActivity(
+            @PathVariable Long momentId,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        log.info("📋 GET /api/moments/{}/activity", momentId);
+
+        try {
+            Map<String, Object> result = momentService.getMomentActivity(momentId);
+            return ResponseEntity.ok(ApiResponse.success(result));
+
+        } catch (Exception e) {
+            log.error("❌ Error getting moment activity", e);
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Failed to get moment activity: " + e.getMessage()));
+        }
+    }
+}

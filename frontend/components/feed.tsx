@@ -16,7 +16,39 @@ export function Feed({ selectedFilter }: FeedProps) {
   const [moments, setMoments] = useState<MomentResponseDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [sendToFriendsModal, setSendToFriendsModal] = useState<{ image: string; username: string } | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const { toast } = useToast()
+
+  // Get current user ID from localStorage
+  useEffect(() => {
+    const userId = localStorage.getItem('userId')
+    console.log('📋 [Feed] Getting userId from localStorage:', userId)
+
+    if (userId) {
+      setCurrentUserId(Number(userId))
+      console.log('✅ [Feed] Set currentUserId to:', Number(userId))
+    } else {
+      // FALLBACK: Try to get from user object or use default for testing
+      const userStr = localStorage.getItem('user')
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr)
+          if (user.id) {
+            setCurrentUserId(user.id)
+            console.log('✅ [Feed] Set currentUserId from user object:', user.id)
+          }
+        } catch (e) {
+          console.error('❌ [Feed] Failed to parse user from localStorage:', e)
+        }
+      }
+
+      // TEMPORARY: For testing, use hardcoded user ID if nothing else works
+      if (!userId && !userStr) {
+        console.warn('⚠️ [Feed] No userId in localStorage, using fallback userId=1')
+        setCurrentUserId(1) // TEMPORARY for testing
+      }
+    }
+  }, [])
 
   useEffect(() => {
     loadMoments()
@@ -112,26 +144,37 @@ export function Feed({ selectedFilter }: FeedProps) {
   return (
     <>
       <div className="flex flex-col gap-6">
-        {moments.map((moment) => (
-          <Post
-            key={moment.id}
-            id={moment.id.toString()}
-            username={moment.user.username}
-            displayName={moment.user.displayName}
-            userAvatar={getAvatarUrl(moment.user.avatarUrl)}
-            status=""
-            isOnline={false} // TODO: Get from backend when user online status is implemented
-            image={getImageUrl(moment.imagePath)}
-            likes={moment.reactionCount || 0}
-            caption={moment.caption || ""}
-            comments={[]}
-            timeAgo={moment.timeAgo || ""}
-            onSendToFriends={() => setSendToFriendsModal({
-              image: getImageUrl(moment.imagePath),
-              username: moment.user.username
-            })}
-          />
-        ))}
+        {moments.map((moment) => {
+          const isOwner = currentUserId !== null && moment.user.id === currentUserId
+          console.log('🔍 [Feed] Moment:', moment.id,
+            'currentUserId:', currentUserId,
+            'moment.user.id:', moment.user.id,
+            'isOwner:', isOwner)
+
+          return (
+            <Post
+              key={moment.id}
+              id={moment.id.toString()}
+              username={moment.user.username}
+              displayName={moment.user.displayName}
+              userAvatar={getAvatarUrl(moment.user.avatarUrl)}
+              status=""
+              isOnline={false}
+              image={getImageUrl(moment.imagePath)}
+              likes={moment.reactionCount || 0}
+              caption={moment.caption || ""}
+              comments={[]}
+              timeAgo={moment.timeAgo || ""}
+              // NEW PROPS
+              isOwner={isOwner}
+              allowJoinIn={false} // TODO: Get from backend when available
+              onSendToFriends={() => setSendToFriendsModal({
+                image: getImageUrl(moment.imagePath),
+                username: moment.user.username
+              })}
+            />
+          )
+        })}
       </div>
 
       {sendToFriendsModal && (
