@@ -14,18 +14,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Settings, Grid3x3, Bookmark, Camera, Trash2, X } from "lucide-react"
 import Image from "next/image"
 import { profileService } from "@/lib/services/profileService"
-import { toggleFriendRequest, unfriend } from "@/lib/api"
+import { toggleFriendRequest, unfriend, getMomentFeed } from "@/lib/api"
 import { UserProfile } from "@/lib/types/profile"
 import { useAuth } from "@/lib/auth/authContext"
 import { useToast } from "@/hooks/use-toast"
 import { getAvatarUrl } from "@/lib/utils/avatar"
 import { ImageCropModal } from "@/components/image-crop-modal"
-
-const userPosts = [
-  { id: 1, image: "/tokyo-city-night-skyline.jpg", likes: 1234, comments: 56 },
-  { id: 2, image: "/golden-gate-bridge-sunset.jpg", likes: 2341, comments: 89 },
-  { id: 3, image: "/eiffel-tower-evening-paris.jpg", likes: 3456, comments: 123 },
-]
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -40,12 +34,14 @@ export default function ProfilePage() {
   const [activePanel, setActivePanel] = useState<"search" | "notifications" | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedFriend, setSelectedFriend] = useState<string>("All")
-  const [selectedPost, setSelectedPost] = useState<(typeof userPosts)[0] | null>(null)
+  const [selectedPost, setSelectedPost] = useState<MomentResponseDTO | null>(null)
 
   // New states for API integration
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [userPosts, setUserPosts] = useState<MomentResponseDTO[]>([])
+  const [isLoadingPosts, setIsLoadingPosts] = useState(false)
 
   // Image crop states
   const [imageToCrop, setImageToCrop] = useState<string | null>(null)
@@ -68,6 +64,9 @@ export default function ProfilePage() {
       setIsLoading(true)
       const data = await profileService.getUserProfile(userId)
       setProfile(data)
+
+      // Load user posts
+      await loadUserPosts(userId)
     } catch (error: any) {
       console.error("Failed to load profile:", error)
       toast({
@@ -77,6 +76,20 @@ export default function ProfilePage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadUserPosts = async (userId: number) => {
+    try {
+      setIsLoadingPosts(true)
+      // Get user's own posts (mine filter)
+      const data = await getMomentFeed('mine', 0, 50) // Get up to 50 posts
+      setUserPosts(data.content || [])
+    } catch (error: any) {
+      console.error("Failed to load user posts:", error)
+      setUserPosts([])
+    } finally {
+      setIsLoadingPosts(false)
     }
   }
 
@@ -238,6 +251,14 @@ export default function ProfilePage() {
     setMessengerOpen(false)
   }
 
+  const getImageUrl = (imagePath: string) => {
+    if (!imagePath) return "/placeholder.jpg"
+    if (imagePath.startsWith('http')) return imagePath
+    // Remove leading slash if exists to avoid double slash
+    const cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${cleanPath}`
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex">
@@ -391,7 +412,7 @@ export default function ProfilePage() {
                       onClick={() => setSelectedPost(post)}
                     >
                       <Image
-                        src={post.image || "/placeholder.svg"}
+                        src={getImageUrl(post.imagePath)}
                         alt="Post"
                         fill
                         className="object-cover"
@@ -400,11 +421,7 @@ export default function ProfilePage() {
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6">
                         <div className="flex items-center gap-2 text-white font-semibold">
                           <span>❤️</span>
-                          <span>{post.likes}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-white font-semibold">
-                          <span>💬</span>
-                          <span>{post.comments}</span>
+                          <span>{post.reactionCount}</span>
                         </div>
                       </div>
                     </div>
@@ -447,4 +464,3 @@ export default function ProfilePage() {
     </div>
   )
 }
-

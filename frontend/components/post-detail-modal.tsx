@@ -1,42 +1,49 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { X, MoreVertical, Copy, Trash2, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Image from "next/image"
+import { MomentResponseDTO, getMomentActivity } from "@/lib/api"
 
 interface Reaction {
+  userId: number
   username: string
-  reaction: string
+  avatarUrl: string
+  reactionType: string
+  emoji: string
+  reactedAt: string
 }
 
 interface PostDetailModalProps {
-  post: {
-    id: number
-    image: string
-    likes: number
-    comments: number
-    reactions?: Reaction[]
-  }
+  post: MomentResponseDTO
   onClose: () => void
-}
-
-const reactionEmojis: Record<string, string> = {
-  like: "👍",
-  love: "❤️",
-  haha: "😂",
-  wow: "😲",
-  sad: "😢",
-  angry: "😠",
 }
 
 export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const [reactions, setReactions] = useState<Reaction[]>([])
+  const [loading, setLoading] = useState(false)
 
-  // Use real reactions from post, empty array if none
-  const reactions: Reaction[] = post.reactions || []
+  // Load reactions when modal opens
+  useEffect(() => {
+    loadReactions()
+  }, [post.id])
+
+  const loadReactions = async () => {
+    try {
+      setLoading(true)
+      const data = await getMomentActivity(post.id)
+      setReactions(data.reactions || [])
+    } catch (error) {
+      console.error("Failed to load reactions:", error)
+      setReactions([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`)
@@ -51,6 +58,22 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
     setTimeout(() => {
       onClose()
     }, 300)
+  }
+
+  // Helper function to get avatar URL
+  const getAvatarUrl = (avatarUrl: string | null) => {
+    if (!avatarUrl) return "/placeholder-user.jpg"
+    if (avatarUrl.startsWith('http')) return avatarUrl
+    const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${cleanPath}`
+  }
+
+  // Helper function to get image URL
+  const getImageUrl = (imagePath: string) => {
+    if (!imagePath) return "/placeholder.jpg"
+    if (imagePath.startsWith('http')) return imagePath
+    const cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${cleanPath}`
   }
 
   return (
@@ -73,7 +96,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
           {/* Left side - Image */}
           <div className="flex-[2] bg-black flex items-center justify-center">
             <Image
-              src={post.image || "/placeholder.svg"}
+              src={getImageUrl(post.imagePath)}
               alt="Post"
               width={600}
               height={600}
@@ -87,10 +110,10 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Avatar className="w-8 h-8">
-                  <AvatarImage src="/images/design-mode/image.png" />
-                  <AvatarFallback>JB</AvatarFallback>
+                  <AvatarImage src={getAvatarUrl(post.user.avatarUrl)} />
+                  <AvatarFallback>{post.user.displayName?.charAt(0).toUpperCase() || post.user.username.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
-                <span className="text-sm font-semibold">jbleclgt</span>
+                <span className="text-sm font-semibold">{post.user.displayName || post.user.username}</span>
               </div>
 
               <DropdownMenu>
@@ -122,21 +145,25 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
             {/* Reactions section */}
             <div className="px-4 py-4 border-b border-border flex-1 overflow-y-auto">
               <div className="mb-3">
-                <p className="text-xs font-semibold text-muted-foreground mb-2">{reactions.length} REACTIONS</p>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">
+                  {loading ? "Loading reactions..." : `${reactions.length} REACTIONS`}
+                </p>
               </div>
 
               <div className="space-y-2">
-                {reactions.length === 0 ? (
+                {loading ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Loading reactions...</p>
+                ) : reactions.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">No reactions yet</p>
                 ) : (
                   reactions.map((item, index) => (
-                    <div key={index} className="flex items-center gap-2">
+                    <div key={`${item.userId}-${item.reactionType}`} className="flex items-center gap-2">
                       <Avatar className="w-6 h-6">
-                        <AvatarImage src={`/images/design-mode/image.png`} />
+                        <AvatarImage src={getAvatarUrl(item.avatarUrl)} />
                         <AvatarFallback>{item.username[0].toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <span className="text-sm text-foreground flex-1">{item.username}</span>
-                      <span className="text-lg">{reactionEmojis[item.reaction] || "👍"}</span>
+                      <span className="text-lg">{item.emoji}</span>
                     </div>
                   ))
                 )}
@@ -146,8 +173,7 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
             {/* Stats footer */}
             <div className="px-4 py-3 border-t border-border text-center text-sm text-muted-foreground">
               <div className="flex justify-center gap-4">
-                <span>❤️ {post.likes} likes</span>
-                <span>💬 {post.comments} comments</span>
+                <span>❤️ {post.reactionCount} reacts</span>
               </div>
             </div>
           </div>
