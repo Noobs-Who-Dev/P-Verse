@@ -244,3 +244,78 @@ export async function getSentRequests(): Promise<UserSearchDto[]> {
   }
 }
 
+// ============================================
+// MOMENT REACTION API
+// ============================================
+
+export type ReactionType = 'LIKE' | 'LOVE' | 'HAHA' | 'WOW' | 'SAD' | 'ANGRY';
+
+export interface ReactionRequest {
+  reactionType: ReactionType;
+}
+
+export interface ReactionResponse {
+  action: 'added' | 'removed' | 'updated';
+  reactionType: ReactionType | null;
+  totalReactions: number;
+}
+
+export interface UserReactionResponse {
+  reactionType: ReactionType;
+  createdAt: string;
+}
+
+/**
+ * Add or toggle reaction to a moment
+ * POST /api/moments/{momentId}/reactions
+ */
+export async function addMomentReaction(
+  momentId: number,
+  reactionType: ReactionType
+): Promise<ReactionResponse> {
+  try {
+    const response = await axiosInstance.post<ApiResponse<ReactionResponse>>(
+      `/moments/${momentId}/reactions`,
+      { reactionType }
+    );
+    return response.data.data;
+  } catch (error) {
+    console.error('[API] Add moment reaction failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get current user's reaction for a moment
+ * GET /api/moments/{momentId}/reactions/me
+ */
+export async function getMyReaction(momentId: number): Promise<UserReactionResponse | null> {
+  try {
+    const response = await axiosInstance.get<ApiResponse<UserReactionResponse>>(
+      `/moments/${momentId}/reactions/me`
+    );
+    return response.data.data;
+  } catch (error: any) {
+    // 204 No Content means no reaction yet - this is normal
+    if (error.response?.status === 204) {
+      return null;
+    }
+    // Log other errors but don't throw - let component handle gracefully
+    console.error('[API] Get my reaction failed:', error.message || error);
+    return null; // Return null instead of throwing for better UX
+  }
+}
+
+/**
+ * Remove reaction from a moment
+ * DELETE /api/moments/{momentId}/reactions
+ */
+export async function removeMomentReaction(momentId: number): Promise<void> {
+  try {
+    await axiosInstance.delete(`/moments/${momentId}/reactions`);
+  } catch (error) {
+    console.error('[API] Remove moment reaction failed:', error);
+    throw error;
+  }
+}
+
