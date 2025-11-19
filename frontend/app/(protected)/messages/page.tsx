@@ -252,8 +252,6 @@ export default function MessagesPage() {
       {showCreateModal && (
         <CreatePostModal
           onClose={() => setShowCreateModal(false)}
-          selectedFriend={selectedFriend}
-          onSelectFriend={setSelectedFriend}
         />
       )}
     </div>

@@ -17,6 +17,13 @@ export function FriendRequestsDetail({ onBack }: FriendRequestsDetailProps) {
   const [isUpdating, setIsUpdating] = useState<Record<number, boolean>>({})
   const { toast } = useToast()
 
+  const getAvatarUrl = (avatarUrl: string | null) => {
+    if (!avatarUrl) return "/placeholder-user.jpg"
+    if (avatarUrl.startsWith('http')) return avatarUrl
+    const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${cleanPath}`
+  }
+
   useEffect(() => {
     loadRequests()
   }, [])
@@ -102,22 +109,22 @@ export function FriendRequestsDetail({ onBack }: FriendRequestsDetailProps) {
           </div>
         ) : requests.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">No pending friend requests</p>
+            <p className="text-muted-foreground">No friend requests</p>
           </div>
         ) : (
           requests.map((request) => (
-            <div key={request.id} className="p-4 border border-border rounded-xl bg-card">
-              <div className="flex items-start gap-3 mb-4">
+            <div key={request.id} className="p-4 bg-card rounded-lg border border-border hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-3">
                 <Avatar className="w-12 h-12">
-                  <AvatarImage src={request.avatarUrl || "/placeholder.svg"} alt={request.displayName} />
-                  <AvatarFallback>{request.username[0]}</AvatarFallback>
+                  <AvatarImage src={getAvatarUrl(request.avatarUrl)} alt={request.displayName || request.username} />
+                  <AvatarFallback>{(request.displayName || request.username)[0].toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <div className="font-medium">{request.username}</div>
-                  <div className="text-sm text-muted-foreground">{request.displayName}</div>
+                  <div className="font-medium">{request.displayName || request.username}</div>
+                  <div className="text-sm text-muted-foreground">@{request.username}</div>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mt-3">
                 <Button
                   onClick={() => handleAccept(request.id)}
                   disabled={isUpdating[request.id]}

@@ -430,8 +430,6 @@ export default function ProfilePage() {
       {showCreateModal && (
         <CreatePostModal
           onClose={() => setShowCreateModal(false)}
-          selectedFriend={selectedFriend}
-          onSelectFriend={setSelectedFriend}
         />
       )}
 

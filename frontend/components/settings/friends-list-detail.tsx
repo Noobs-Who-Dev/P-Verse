@@ -19,6 +19,13 @@ export function FriendsListDetail({ searchQuery, setSearchQuery, onBack }: Frien
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
 
+  const getAvatarUrl = (avatarUrl: string | null) => {
+    if (!avatarUrl) return "/placeholder-user.jpg"
+    if (avatarUrl.startsWith('http')) return avatarUrl
+    const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${cleanPath}`
+  }
+
   useEffect(() => {
     loadFriends()
   }, [])
@@ -103,12 +110,12 @@ export function FriendsListDetail({ searchQuery, setSearchQuery, onBack }: Frien
             >
               <div className="flex items-center gap-3">
                 <Avatar className="w-12 h-12">
-                  <AvatarImage src={friend.avatarUrl || "/placeholder.svg"} alt={friend.displayName} />
-                  <AvatarFallback>{friend.username[0]}</AvatarFallback>
+                  <AvatarImage src={getAvatarUrl(friend.avatarUrl)} alt={friend.displayName || friend.username} />
+                  <AvatarFallback>{(friend.displayName || friend.username)[0].toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <div className="font-medium">{friend.username}</div>
-                  <div className="text-sm text-muted-foreground">{friend.displayName}</div>
+                  <div className="font-medium">{friend.displayName || friend.username}</div>
+                  <div className="text-sm text-muted-foreground">@{friend.username}</div>
                 </div>
               </div>
               <DropdownMenu>

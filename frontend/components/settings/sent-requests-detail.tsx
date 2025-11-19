@@ -14,8 +14,15 @@ interface SentRequestsDetailProps {
 export function SentRequestsDetail({ onBack }: SentRequestsDetailProps) {
   const [requests, setRequests] = useState<UserSearchDto[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isUpdating, setIsUpdating] = useState<Record<number, boolean>>({})
+  const [isCancelling, setIsCancelling] = useState<Record<number, boolean>>({})
   const { toast } = useToast()
+
+  const getAvatarUrl = (avatarUrl: string | null) => {
+    if (!avatarUrl) return "/placeholder-user.jpg"
+    if (avatarUrl.startsWith('http')) return avatarUrl
+    const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${cleanPath}`
+  }
 
   useEffect(() => {
     loadRequests()
@@ -39,9 +46,9 @@ export function SentRequestsDetail({ onBack }: SentRequestsDetailProps) {
   }
 
   const handleCancel = async (userId: number) => {
-    if (isUpdating[userId]) return
+    if (isCancelling[userId]) return
 
-    setIsUpdating((prev) => ({ ...prev, [userId]: true }))
+    setIsCancelling((prev) => ({ ...prev, [userId]: true }))
     try {
       const response = await toggleFriendRequest(userId)
       if (response.success) {
@@ -56,7 +63,7 @@ export function SentRequestsDetail({ onBack }: SentRequestsDetailProps) {
         variant: "destructive",
       })
     } finally {
-      setIsUpdating((prev) => ({ ...prev, [userId]: false }))
+      setIsCancelling((prev) => ({ ...prev, [userId]: false }))
     }
   }
 
@@ -84,25 +91,25 @@ export function SentRequestsDetail({ onBack }: SentRequestsDetailProps) {
           requests.map((request) => (
             <div key={request.id} className="p-4 border border-border rounded-xl bg-card">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1">
                   <Avatar className="w-12 h-12">
-                    <AvatarImage src={request.avatarUrl || "/placeholder.svg"} alt={request.displayName} />
-                    <AvatarFallback>{request.username[0]}</AvatarFallback>
+                    <AvatarImage src={getAvatarUrl(request.avatarUrl)} alt={request.displayName} />
+                    <AvatarFallback>{(request.displayName || request.username)[0].toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="font-medium">{request.username}</div>
-                    <div className="text-sm text-muted-foreground">{request.displayName}</div>
+                    <div className="font-medium">{request.displayName || request.username}</div>
+                    <div className="text-sm text-muted-foreground">@{request.username}</div>
                   </div>
                 </div>
                 <Button
                   onClick={() => handleCancel(request.id)}
-                  disabled={isUpdating[request.id]}
+                  disabled={isCancelling[request.id]}
                   variant="ghost"
                   size="sm"
                   className="text-red-500 hover:text-red-500/90 hover:bg-red-500/10 disabled:opacity-50"
                 >
                   <X className="w-4 h-4 mr-2" />
-                  {isUpdating[request.id] ? "..." : "Cancel"}
+                  {isCancelling[request.id] ? "..." : "Cancel"}
                 </Button>
               </div>
             </div>

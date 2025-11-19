@@ -8,7 +8,9 @@ import { useState } from "react"
 import { PhotoEditModal } from "./photo-edit-modal"
 
 interface PostProps {
+  id?: string
   username: string
+  displayName?: string
   userAvatar: string
   location?: string
   image: string
@@ -17,6 +19,7 @@ interface PostProps {
   comments: Array<{ username: string; text: string }>
   timeAgo: string
   status?: string
+  isOnline?: boolean
   onSendToFriends?: () => void
 }
 
@@ -30,7 +33,9 @@ const reactions = [
 ]
 
 export function Post({
+  id,
   username,
+  displayName,
   userAvatar,
   location,
   image,
@@ -39,6 +44,7 @@ export function Post({
   comments,
   timeAgo,
   status,
+  isOnline,
   onSendToFriends,
 }: PostProps) {
   const [selectedReaction, setSelectedReaction] = useState<number | null>(null)
@@ -70,16 +76,26 @@ export function Post({
         {/* Post Header */}
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <Avatar className="w-8 h-8">
-              <AvatarImage src={userAvatar || "/placeholder.svg?height=32&width=32&query=user+profile+avatar"} />
-              <AvatarFallback>{username[0].toUpperCase()}</AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="w-8 h-8">
+                <AvatarImage src={userAvatar || "/placeholder.svg?height=32&width=32&query=user+profile+avatar"} />
+                <AvatarFallback>{(displayName || username)[0].toUpperCase()}</AvatarFallback>
+              </Avatar>
+              {isOnline && (
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-card rounded-full"></span>
+              )}
+            </div>
             <div className="flex flex-col">
-              <span className="text-sm font-semibold">{username}</span>
-              {status && (
-                <span className="text-xs text-[#a8a8a8] flex items-center gap-1">
-                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                  {status}
+              <span className="text-sm font-semibold">{displayName || username}</span>
+              {(status || timeAgo) && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  {status && (
+                    <>
+                      <span className={`w-1.5 h-1.5 ${isOnline ? 'bg-green-500' : 'bg-gray-400'} rounded-full`}></span>
+                      {status}
+                    </>
+                  )}
+                  {!status && timeAgo && timeAgo}
                 </span>
               )}
             </div>
@@ -92,14 +108,18 @@ export function Post({
         {/* Post Image with caption overlay (Locket style) */}
         <div className="relative aspect-square bg-muted">
           <img
-            src={image || "/placeholder.svg?height=600&width=600&query=instagram+post+photo"}
+            src={image || "/placeholder.jpg"}
             alt={`Post by ${username}`}
             className="w-full h-full object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = '/placeholder.jpg';
+            }}
           />
 
           {/* Caption overlay on image */}
           {caption && (
-            <div className="absolute bottom-0 left-0 right-0 p-6 flex justify-center">
+            <div className="absolute bottom-0 left-0 right-0 p-6 flex justify-center z-10">
               <div className="bg-muted/90 backdrop-blur-sm rounded-2xl px-4 py-3 inline-block">
                 <p className="text-sm text-foreground">{caption}</p>
               </div>

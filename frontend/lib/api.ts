@@ -105,6 +105,131 @@ export async function getReceivedRequests(): Promise<UserSearchDto[]> {
   }
 }
 
+// ============================================
+// MOMENT API (Instagram Stories)
+// ============================================
+
+export type MomentVisibility = 'ALL_FRIENDS' | 'PRIVATE' | 'SPECIFIC_PERSON';
+
+export interface CreateMomentRequest {
+  image: File;
+  caption?: string;
+  visibility: MomentVisibility;
+  specificUserId?: number;
+}
+
+export interface MomentResponseDTO {
+  id: number;
+  user: {
+    id: number;
+    username: string;
+    avatarUrl: string | null;
+    displayName: string;
+  };
+  caption: string | null;
+  imagePath: string;
+  visibility: MomentVisibility;
+  specificUser: {
+    id: number;
+    username: string;
+    avatarUrl: string | null;
+    displayName: string;
+  } | null;
+  createdAt: string;
+  reactionCount: number;
+  hasReacted: boolean;
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  message?: string;
+  data: T;
+  timestamp: string;
+}
+
+/**
+ * Tạo moment mới
+ * POST /api/moments
+ */
+export async function createMoment(request: CreateMomentRequest): Promise<MomentResponseDTO> {
+  try {
+    const formData = new FormData();
+    formData.append('image', request.image);
+
+    if (request.caption) {
+      formData.append('caption', request.caption);
+    }
+
+    formData.append('visibility', request.visibility);
+
+    if (request.specificUserId) {
+      formData.append('specificUserId', request.specificUserId.toString());
+    }
+
+    const response = await axiosInstance.post<ApiResponse<MomentResponseDTO>>(
+      '/moments',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+
+    return response.data.data;
+  } catch (error) {
+    console.error('[API] Create moment failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Lấy moment feed với filter
+ * GET /api/moments/feed?filter=all&page=0&size=20
+ */
+export async function getMomentFeed(
+  filter: 'all' | 'friends' | 'mine' = 'all',
+  page: number = 0,
+  size: number = 20
+) {
+  try {
+    const response = await axiosInstance.get<ApiResponse<any>>('/moments/feed', {
+      params: { filter, page, size }
+    });
+    return response.data.data;
+  } catch (error) {
+    console.error('[API] Get moment feed failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Lấy moment theo ID
+ * GET /api/moments/{id}
+ */
+export async function getMomentById(id: number): Promise<MomentResponseDTO> {
+  try {
+    const response = await axiosInstance.get<ApiResponse<MomentResponseDTO>>(`/moments/${id}`);
+    return response.data.data;
+  } catch (error) {
+    console.error('[API] Get moment failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Xóa moment
+ * DELETE /api/moments/{id}
+ */
+export async function deleteMoment(id: number): Promise<void> {
+  try {
+    await axiosInstance.delete(`/moments/${id}`);
+  } catch (error) {
+    console.error('[API] Delete moment failed:', error);
+    throw error;
+  }
+}
+
 /**
  * Lay danh sach friend requests da gui
  * GET /api/friends/requests/sent

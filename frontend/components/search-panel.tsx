@@ -25,6 +25,13 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
   const [isUpdatingFriend, setIsUpdatingFriend] = useState<Record<number, boolean>>({})
   const [searchError, setSearchError] = useState<string | null>(null)
 
+  const getAvatarUrl = (avatarUrl: string | null) => {
+    if (!avatarUrl) return "/placeholder-user.jpg"
+    if (avatarUrl.startsWith('http')) return avatarUrl
+    const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${cleanPath}`
+  }
+
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value)
@@ -286,12 +293,12 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
                   >
                     <div className="flex items-center gap-3 flex-1">
                       <Avatar className="w-11 h-11">
-                        <AvatarImage src={user.avatarUrl || "/placeholder.svg"} />
-                        <AvatarFallback>{user.displayName?.[0] || user.username[0]}</AvatarFallback>
+                        <AvatarImage src={getAvatarUrl(user.avatarUrl)} />
+                        <AvatarFallback>{(user.displayName || user.username)[0].toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="text-sm font-semibold">{user.username}</p>
-                        <p className="text-sm text-muted-foreground">{user.displayName}</p>
+                        <p className="text-sm font-semibold">{user.displayName || user.username}</p>
+                        <p className="text-sm text-muted-foreground">@{user.username}</p>
                       </div>
                     </div>
                     {renderFriendButton(user)}

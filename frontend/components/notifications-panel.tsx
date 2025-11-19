@@ -49,6 +49,13 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const [isAccepting, setIsAccepting] = useState<Record<number, boolean>>({})
   const { toast } = useToast()
 
+  const getAvatarUrl = (avatarUrl: string | null) => {
+    if (!avatarUrl) return "/placeholder-user.jpg"
+    if (avatarUrl.startsWith('http')) return avatarUrl
+    const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${cleanPath}`
+  }
+
   useEffect(() => {
     loadFriendRequests()
   }, [])
@@ -96,20 +103,20 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
         <h2 className="text-2xl font-semibold mb-6">Notifications</h2>
 
         {/* Friend Requests Section */}
-        {!isLoading && friendRequests.length > 0 && (
-          <div className="border-b border-border pb-4 mb-4">
+        {friendRequests.length > 0 && (
+          <div className="mb-6">
             <h3 className="text-sm font-semibold text-muted-foreground mb-3">Friend Requests</h3>
 
             {friendRequests.map((request) => (
               <div key={request.id} className="flex items-center gap-3 p-3 hover:bg-muted rounded-lg mb-2">
                 <Avatar className="w-10 h-10">
-                  <AvatarImage src={request.avatarUrl || "/placeholder.svg"} />
-                  <AvatarFallback>{request.username[0].toUpperCase()}</AvatarFallback>
+                  <AvatarImage src={getAvatarUrl(request.avatarUrl)} />
+                  <AvatarFallback>{(request.displayName || request.username)[0].toUpperCase()}</AvatarFallback>
                 </Avatar>
 
                 <div className="flex-1">
-                  <div className="font-medium text-sm">{request.username}</div>
-                  <div className="text-xs text-muted-foreground">{request.displayName}</div>
+                  <div className="font-medium text-sm">{request.displayName || request.username}</div>
+                  <div className="text-xs text-muted-foreground">@{request.username}</div>
                 </div>
 
                 <Button

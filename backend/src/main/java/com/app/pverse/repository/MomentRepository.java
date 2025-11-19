@@ -47,6 +47,21 @@ public interface MomentRepository extends JpaRepository<Moment, Long> {
     );
 
     /**
+     * Lấy moments của friends only (exclude own moments)
+     * Used for "Friends" tab filter
+     */
+    @Query("SELECT DISTINCT m FROM Moment m " +
+            "WHERE m.visibility = 'ALL_FRIENDS' " +
+            "AND m.user.id IN :friendIds " +
+            "AND m.user.id != :currentUserId " +
+            "ORDER BY m.createdAt DESC, m.id DESC")
+    Slice<Moment> findFriendsMoments(
+            @Param("friendIds") List<Long> friendIds,
+            @Param("currentUserId") Long currentUserId,
+            Pageable pageable
+    );
+
+    /**
      * Lấy moments được share riêng cho user (SPECIFIC_PERSON)
      */
     Slice<Moment> findByVisibilityAndSpecificUserIdOrderByCreatedAtDesc(
@@ -79,4 +94,37 @@ public interface MomentRepository extends JpaRepository<Moment, Long> {
             "OR m.visibility = 'ALL_FRIENDS' " +
             "OR (m.visibility = 'SPECIFIC_PERSON' AND m.specificUser.id = :userId))")
     boolean canUserViewMoment(@Param("momentId") Long momentId, @Param("userId") Long userId);
+
+    /**
+     * CURSOR-BASED PAGINATION
+     * Lấy feed moments với cursor (createdAt, id)
+     * Cursor format: "timestamp_momentId"
+     */
+    @Query("SELECT DISTINCT m FROM Moment m " +
+            "WHERE ((m.visibility = 'ALL_FRIENDS' AND m.user.id IN :friendIds) " +
+            "OR (m.visibility = 'SPECIFIC_PERSON' AND m.specificUser.id = :currentUserId) " +
+            "OR (m.user.id = :currentUserId)) " +
+            "AND (m.createdAt < :cursorTime OR (m.createdAt = :cursorTime AND m.id < :cursorId)) " +
+            "ORDER BY m.createdAt DESC, m.id DESC")
+    List<Moment> findFeedMomentsWithCursor(
+            @Param("friendIds") List<Long> friendIds,
+            @Param("currentUserId") Long currentUserId,
+            @Param("cursorTime") java.time.LocalDateTime cursorTime,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable
+    );
+
+    /**
+     * Initial feed query (no cursor) for cursor-based pagination
+     */
+    @Query("SELECT DISTINCT m FROM Moment m " +
+            "WHERE (m.visibility = 'ALL_FRIENDS' AND m.user.id IN :friendIds) " +
+            "OR (m.visibility = 'SPECIFIC_PERSON' AND m.specificUser.id = :currentUserId) " +
+            "OR (m.user.id = :currentUserId) " +
+            "ORDER BY m.createdAt DESC, m.id DESC")
+    List<Moment> findFeedMomentsInitial(
+            @Param("friendIds") List<Long> friendIds,
+            @Param("currentUserId") Long currentUserId,
+            Pageable pageable
+    );
 }
