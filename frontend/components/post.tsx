@@ -4,8 +4,10 @@ import { Heart, MoreHorizontal, ThumbsUp, Laugh, Frown, Angry, PartyPopper, Smil
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { PhotoEditModal } from "./photo-edit-modal"
+import { useToast } from "@/hooks/use-toast"
+import { addMomentReaction, getMyReaction, type ReactionType } from "@/lib/api"
 
 interface PostProps {
   id?: string
@@ -54,10 +56,120 @@ export function Post({
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const [messageInput, setMessageInput] = useState("")
   const [isSaved, setIsSaved] = useState(false)
+  const [reactionCount, setReactionCount] = useState(likes || 0)
+  const [isReacting, setIsReacting] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
 
-  const handleReactionClick = (index: number) => {
-    setSelectedReaction(selectedReaction === index ? null : index)
-    setIsReactionOpen(false)
+  // Map frontend reaction index to backend ReactionType
+  const reactionTypeMap = ['LIKE', 'LOVE', 'HAHA', 'WOW', 'SAD', 'ANGRY']
+  const reactionTypeToIndex: Record<string, number> = {
+    'LIKE': 0,
+    'LOVE': 1,
+    'HAHA': 2,
+    'WOW': 3,
+    'SAD': 4,
+    'ANGRY': 5,
+  }
+
+  // Load current user's reaction on mount
+  const loadMyReaction = async () => {
+    if (!id || isLoading) return
+
+    setIsLoading(true)
+    try {
+      const result = await getMyReaction(Number(id))
+
+      if (result && result.reactionType && reactionTypeToIndex[result.reactionType] !== undefined) {
+        setSelectedReaction(reactionTypeToIndex[result.reactionType])
+        console.log('✅ Loaded existing reaction:', result.reactionType)
+      } else {
+        // No reaction yet - this is normal
+        setSelectedReaction(null)
+      }
+    } catch (error: any) {
+      // Network error or other issues - just log and continue
+      // Don't break the UI if we can't load reactions
+      console.error('⚠️ Could not load reaction (backend might be down):', error.message || error)
+      setSelectedReaction(null)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Load reaction on mount
+  useEffect(() => {
+    if (id) {
+      loadMyReaction()
+    }
+  }, [id])
+
+  const handleReactionClick = async (index: number) => {
+    if (!id || isReacting) return
+
+    // Save previous state for rollback
+    const previousReaction = selectedReaction
+    const previousCount = reactionCount
+    const isSameReaction = selectedReaction === index
+
+    // OPTIMISTIC UI UPDATE - Immediate feedback
+    if (isSameReaction) {
+      // Toggle off - remove reaction
+      setSelectedReaction(null)
+      setReactionCount(prev => Math.max(0, prev - 1))
+    } else if (selectedReaction === null) {
+      // New reaction - add
+      setSelectedReaction(index)
+      setReactionCount(prev => prev + 1)
+    } else {
+      // Change reaction - count stays same
+      setSelectedReaction(index)
+    }
+
+    setIsReacting(true)
+
+    try {
+      console.log('🎯 Reacting to moment:', id, 'with type:', reactionTypeMap[index])
+
+      const result = await addMomentReaction(Number(id), reactionTypeMap[index] as ReactionType)
+      console.log('✅ Reaction response:', result)
+
+      // SYNC WITH SERVER DATA - Ensure consistency
+      if (result.action === 'removed') {
+        setSelectedReaction(null)
+      } else {
+        setSelectedReaction(index)
+      }
+      setReactionCount(result.totalReactions || 0)
+
+      // Show success toast
+      toast({
+        title: result.action === 'removed' ? 'Reaction removed' : 'Reacted!',
+        description: result.action === 'removed'
+          ? 'Your reaction has been removed'
+          : `You reacted with ${reactions[index].label}`,
+      })
+    } catch (error: any) {
+      // ERROR HANDLING - Rollback optimistic update
+      console.error('❌ Error reacting to moment:', error)
+
+      // Rollback to previous state
+      setSelectedReaction(previousReaction)
+      setReactionCount(previousCount)
+
+      // Show error toast
+      const status = error.response?.status
+      toast({
+        title: 'Failed to react',
+        description: status === 403
+          ? "You don't have permission to react to this moment"
+          : 'Something went wrong. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsReacting(false)
+      setIsReactionOpen(false)
+    }
   }
 
   const emojis = ["😊", "😂", "❤️", "👍", "🎉", "🔥", "😍", "🤔", "👏", "🙌", "💯", "✨"]

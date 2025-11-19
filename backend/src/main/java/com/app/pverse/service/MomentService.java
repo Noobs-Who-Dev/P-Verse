@@ -7,6 +7,7 @@ import com.app.pverse.dto.request.CreateMomentRequest;
 import com.app.pverse.entity.Friendship;
 import com.app.pverse.entity.Moment;
 import com.app.pverse.entity.Moment.Visibility;
+import com.app.pverse.entity.MomentReaction;
 import com.app.pverse.entity.User;
 import com.app.pverse.exception.InvalidVisibilityException;
 import com.app.pverse.exception.MomentNotFoundException;
@@ -28,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -40,6 +42,7 @@ public class MomentService {
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
     private final FileStorageService fileStorageService;
+    private final com.app.pverse.repository.MomentReactionRepository momentReactionRepository;
 
     /**
      * Feed filter enum for different tab views
@@ -445,6 +448,156 @@ public class MomentService {
     private static class CursorData {
         private LocalDateTime createdAt;
         private Long momentId;
+    }
+
+    // ==================== REACTION METHODS ====================
+
+    /**
+     * Add or toggle reaction to a moment
+     * If user already has same reaction → Remove (toggle off)
+     * If user has different reaction → Update
+     * If user has no reaction → Add new
+     */
+    @Transactional
+    public Map<String, Object> addOrToggleReaction(Long momentId, Long userId, MomentReaction.ReactionType reactionType) {
+        log.info("🎯 addOrToggleReaction: momentId={}, userId={}, type={}", momentId, userId, reactionType);
+
+        // Verify moment exists
+        Moment moment = momentRepository.findById(momentId)
+                .orElseThrow(() -> new MomentNotFoundException(momentId));
+
+        // Verify user exists
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Check if user can view moment (permission check)
+        // For ALL_FRIENDS visibility, user must be a friend
+        if (!canUserReactToMoment(moment, userId)) {
+            log.error("❌ User {} cannot react to moment {}", userId, momentId);
+            throw new UnauthorizedAccessException("You don't have permission to react to this moment");
+        }
+
+        // Find existing reaction
+        var existingReaction = momentReactionRepository.findByMomentIdAndUserId(momentId, userId);
+
+        String action;
+        MomentReaction.ReactionType finalReactionType;
+
+        if (existingReaction.isPresent()) {
+            MomentReaction reaction = existingReaction.get();
+
+            if (reaction.getReactionType() == reactionType) {
+                // Same reaction → Remove (toggle off)
+                momentReactionRepository.delete(reaction);
+                action = "removed";
+                finalReactionType = null;
+                log.info("✅ Reaction removed (toggle off)");
+            } else {
+                // Different reaction → Update
+                reaction.setReactionType(reactionType);
+                momentReactionRepository.save(reaction);
+                action = "updated";
+                finalReactionType = reactionType;
+                log.info("✅ Reaction updated: {} → {}", reaction.getReactionType(), reactionType);
+            }
+        } else {
+            // No existing reaction → Add new
+            MomentReaction newReaction = MomentReaction.builder()
+                    .moment(moment)
+                    .user(user)
+                    .reactionType(reactionType)
+                    .build();
+            momentReactionRepository.save(newReaction);
+            action = "added";
+            finalReactionType = reactionType;
+            log.info("✅ New reaction added");
+        }
+
+        // Get total reaction count
+        long totalReactions = momentReactionRepository.countByMomentId(momentId);
+
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("action", action);
+        result.put("reactionType", finalReactionType != null ? finalReactionType.name() : null);
+        result.put("totalReactions", totalReactions);
+
+        return result;
+    }
+
+    /**
+     * Get user's reaction for a moment
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getUserReaction(Long momentId, Long userId) {
+        log.info("📋 getUserReaction: momentId={}, userId={}", momentId, userId);
+
+        var reaction = momentReactionRepository.findByMomentIdAndUserId(momentId, userId);
+
+        if (reaction.isEmpty()) {
+            return Map.of();
+        }
+
+        MomentReaction r = reaction.get();
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("reactionType", r.getReactionType().name());
+        result.put("createdAt", r.getCreatedAt());
+
+        return result;
+    }
+
+    /**
+     * Remove reaction from a moment
+     */
+    @Transactional
+    public void removeReaction(Long momentId, Long userId) {
+        log.info("🗑️ removeReaction: momentId={}, userId={}", momentId, userId);
+
+        momentReactionRepository.findByMomentIdAndUserId(momentId, userId)
+                .ifPresent(reaction -> {
+                    momentReactionRepository.delete(reaction);
+                    log.info("✅ Reaction deleted");
+                });
+    }
+
+    /**
+     * Check if user can react to a moment (permission check)
+     * User can react if:
+     * 1. They are the owner
+     * 2. Moment visibility is ALL_FRIENDS AND user is a friend
+     * 3. Moment visibility is SPECIFIC_PERSON AND user is the specific person
+     */
+    private boolean canUserReactToMoment(Moment moment, Long userId) {
+        // Owner can always react
+        if (moment.getUser().getId().equals(userId)) {
+            log.info("✅ User is owner");
+            return true;
+        }
+
+        Moment.Visibility visibility = moment.getVisibility();
+        log.info("   Checking visibility: {}", visibility);
+
+        if (visibility == Moment.Visibility.PRIVATE) {
+            // Only owner can react to private moments
+            log.info("❌ PRIVATE moment - only owner can react");
+            return false;
+        }
+
+        if (visibility == Moment.Visibility.ALL_FRIENDS) {
+            // Must be friends with moment owner
+            boolean areFriends = areFriends(moment.getUser().getId(), userId);
+            log.info("   Are friends? {}", areFriends);
+            return areFriends;
+        }
+
+        if (visibility == Moment.Visibility.SPECIFIC_PERSON) {
+            // Must be the specific person
+            boolean isSpecificPerson = moment.getSpecificUser() != null
+                    && moment.getSpecificUser().getId().equals(userId);
+            log.info("   Is specific person? {}", isSpecificPerson);
+            return isSpecificPerson;
+        }
+
+        return false;
     }
 }
 
