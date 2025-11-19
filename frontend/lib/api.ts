@@ -319,3 +319,82 @@ export async function removeMomentReaction(momentId: number): Promise<void> {
   }
 }
 
+/**
+ * Get recent reactions for a moment (for Activity button)
+ * GET /api/moments/{momentId}/reactions/recent
+ */
+export async function getRecentReactions(momentId: number): Promise<{
+  count: number;
+  reactors: Array<{
+    userId: number;
+    username: string;
+    avatarUrl: string;
+    reactionType: ReactionType;
+    createdAt: string;
+  }>;
+}> {
+  try {
+    const response = await axiosInstance.get<ApiResponse<{
+      count: number;
+      reactors: Array<{
+        userId: number;
+        username: string;
+        avatarUrl: string;
+        reactionType: string;
+        createdAt: string;
+      }>;
+    }>>(`/moments/${momentId}/reactions/recent`);
+    return response.data.data;
+  } catch (error) {
+    console.error('[API] Get recent reactions failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get activity data for a moment (views and reactions)
+ * GET /api/moments/{momentId}/activity
+ */
+export async function getMomentActivity(momentId: number): Promise<{
+  viewers: Array<{
+    userId: number;
+    username: string;
+    avatarUrl: string;
+    viewedAt: string;
+  }>;
+  reactions: Array<{
+    userId: number;
+    username: string;
+    avatarUrl: string;
+    reactionType: ReactionType;
+    emoji: string;
+    reactedAt: string;
+  }>;
+  totalViews: number;
+  totalReactions: number;
+}> {
+  try {
+    const response = await axiosInstance.get<ApiResponse<{
+      viewers: Array<{
+        userId: number;
+        username: string;
+        avatarUrl: string;
+        viewedAt: string;
+      }>;
+      reactions: Array<{
+        userId: number;
+        username: string;
+        avatarUrl: string;
+        reactionType: string;
+        emoji: string;
+        reactedAt: string;
+      }>;
+      totalViews: number;
+      totalReactions: number;
+    }>>(`/moments/${momentId}/activity`);
+    return response.data.data;
+  } catch (error) {
+    console.error('[API] Get moment activity failed:', error);
+    throw error;
+  }
+}

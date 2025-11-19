@@ -62,7 +62,8 @@ export function FriendDropdown({ selectedFilter, onSelectFilter }: FriendDropdow
   const getAvatarUrl = (url: string | null) => {
     if (!url) return "/placeholder-user.jpg"
     if (url.startsWith('http')) return url
-    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${url}`
+    const cleanPath = url.startsWith('/') ? url.substring(1) : url
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${cleanPath}`
   }
 
   return (

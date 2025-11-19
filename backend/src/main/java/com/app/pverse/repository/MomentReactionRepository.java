@@ -51,6 +51,11 @@ public interface MomentReactionRepository extends JpaRepository<MomentReaction, 
     void deleteByMomentIdAndUserId(Long momentId, Long userId);
 
     /**
+     * Lấy top 5 reactions gần đây nhất của một moment (for Activity button)
+     */
+    List<MomentReaction> findTop5ByMomentIdOrderByCreatedAtDesc(Long momentId);
+
+    /**
      * Đếm số lượng từng loại reaction của moment
      * Return Object[] = [ReactionType, Long count]
      */
