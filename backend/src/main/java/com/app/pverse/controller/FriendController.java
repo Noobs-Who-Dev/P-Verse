@@ -38,17 +38,15 @@ public class FriendController {
     /**
      * Tìm kiếm users theo keyword
      * GET /api/friends/search?keyword=john
+     * Empty keyword returns all users (for suggestions)
      */
     @GetMapping("/search")
     public ResponseEntity<List<UserSearchDto>> searchUsers(
-            @RequestParam String keyword,
+            @RequestParam(required = false, defaultValue = "") String keyword,
             @RequestAttribute(value = "userId", required = true) Long viewerId) {
 
         log.info("Search users API called: keyword={}, viewerId={}", keyword, viewerId);
 
-        if (keyword == null || keyword.trim().isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
 
         try {
             List<UserSearchDto> results = friendService.searchUsers(keyword, viewerId);

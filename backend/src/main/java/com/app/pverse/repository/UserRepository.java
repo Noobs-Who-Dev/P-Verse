@@ -52,14 +52,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /**
      * Tìm kiếm users theo username, display_name hoặc email
      * Loại trừ bản thân và những người đã block
+     * Empty keyword returns all users (for suggestions)
      */
     @Query(value = """
         SELECT DISTINCT u.* FROM users u
         WHERE u.id != :viewerId
         AND (
-            LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%'))
-            OR LOWER(u.display_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-            OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            :keyword = '' OR
+            LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(u.display_name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
         )
         AND NOT EXISTS (
             SELECT 1 FROM blocked_users b
