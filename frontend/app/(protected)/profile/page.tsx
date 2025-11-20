@@ -8,13 +8,14 @@ import { SearchPanel } from "@/components/search-panel"
 import { NotificationsPanel } from "@/components/notifications-panel"
 import { CreatePostModal } from "@/components/create-post-modal"
 import { PostDetailModal } from "@/components/post-detail-modal"
+import { SavedPostDetailModal } from "@/components/saved-post-detail-modal"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Settings, Grid3x3, Bookmark, Camera, Trash2, X } from "lucide-react"
 import Image from "next/image"
 import { profileService } from "@/lib/services/profileService"
-import { toggleFriendRequest, unfriend, getMomentFeed } from "@/lib/api"
+import { toggleFriendRequest, unfriend, getMomentFeed, getSavedMoments, deleteMoment } from "@/lib/api"
 import { UserProfile } from "@/lib/types/profile"
 import { useAuth } from "@/lib/auth/authContext"
 import { useToast } from "@/hooks/use-toast"
@@ -35,6 +36,8 @@ export default function ProfilePage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedFriend, setSelectedFriend] = useState<string>("All")
   const [selectedPost, setSelectedPost] = useState<MomentResponseDTO | null>(null)
+  const [selectedSavedPost, setSelectedSavedPost] = useState<MomentResponseDTO | null>(null)
+  const [editPost, setEditPost] = useState<MomentResponseDTO | null>(null)
 
   // New states for API integration
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -42,6 +45,8 @@ export default function ProfilePage() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [userPosts, setUserPosts] = useState<MomentResponseDTO[]>([])
   const [isLoadingPosts, setIsLoadingPosts] = useState(false)
+  const [savedPosts, setSavedPosts] = useState<MomentResponseDTO[]>([])
+  const [isLoadingSavedPosts, setIsLoadingSavedPosts] = useState(false)
 
   // Image crop states
   const [imageToCrop, setImageToCrop] = useState<string | null>(null)
@@ -58,6 +63,12 @@ export default function ProfilePage() {
       loadProfile(targetUserId)
     }
   }, [targetUserId])
+
+  useEffect(() => {
+    if (activeTab === "saved" && profile?.isOwnProfile) {
+      loadSavedPosts()
+    }
+  }, [activeTab, profile?.isOwnProfile])
 
   const loadProfile = async (userId: number) => {
     try {
@@ -90,6 +101,19 @@ export default function ProfilePage() {
       setUserPosts([])
     } finally {
       setIsLoadingPosts(false)
+    }
+  }
+
+  const loadSavedPosts = async () => {
+    try {
+      setIsLoadingSavedPosts(true)
+      const data = await getSavedMoments(0, 50) // Get up to 50 saved posts
+      setSavedPosts(data.content || [])
+    } catch (error: any) {
+      console.error("Failed to load saved posts:", error)
+      setSavedPosts([])
+    } finally {
+      setIsLoadingSavedPosts(false)
     }
   }
 
@@ -259,6 +283,45 @@ export default function ProfilePage() {
     return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${cleanPath}`
   }
 
+  const handleEditPost = (post: MomentResponseDTO) => {
+    setEditPost(post)
+    setSelectedPost(null) // Close detail modal
+  }
+
+  const handleUpdatePost = (updatedPost: MomentResponseDTO) => {
+    // Update the post in the local state
+    setUserPosts(prev => prev.map(p => p.id === updatedPost.id ? updatedPost : p))
+    setSavedPosts(prev => prev.map(p => p.id === updatedPost.id ? updatedPost : p))
+    setEditPost(null)
+
+    toast({
+      title: "Success!",
+      description: "Post updated successfully",
+    })
+  }
+
+  const handleDeletePost = async (postId: number) => {
+    try {
+      await deleteMoment(postId)
+
+      // Remove from local state
+      setUserPosts(prev => prev.filter(p => p.id !== postId))
+      setSavedPosts(prev => prev.filter(p => p.id !== postId))
+
+      toast({
+        title: "Success!",
+        description: "Post deleted successfully",
+      })
+    } catch (error: any) {
+      console.error("Failed to delete post:", error)
+      toast({
+        title: "Failed to delete",
+        description: error.response?.data?.message || "Something went wrong",
+        variant: "destructive"
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex">
@@ -388,16 +451,18 @@ export default function ProfilePage() {
                 >
                   <Grid3x3 className="w-4 h-4 scale-150" />
                 </button>
-                <button
-                  onClick={() => setActiveTab("saved")}
-                  className={`flex items-center gap-2 py-4 border-b transition-colors ${
-                    activeTab === "saved"
-                      ? "border-foreground text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Bookmark className="w-4 h-4 scale-150" />
-                </button>
+                {profile?.isOwnProfile && (
+                  <button
+                    onClick={() => setActiveTab("saved")}
+                    className={`flex items-center gap-2 py-4 border-b transition-colors ${
+                      activeTab === "saved"
+                        ? "border-foreground text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Bookmark className="w-4 h-4 scale-150" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -429,8 +494,37 @@ export default function ProfilePage() {
                 </div>
               )}
               {activeTab === "saved" && (
-                <div className="text-center py-16 text-muted-foreground">
-                  <p>No saved posts yet</p>
+                <div className="grid grid-cols-3 gap-1">
+                  {savedPosts.map((post) => {
+                    const isOwnPost = currentUser?.id !== null && post.user.id === currentUser?.id
+                    return (
+                      <div
+                        key={post.id}
+                        className="aspect-square relative group cursor-pointer"
+                        onClick={() => {
+                          if (isOwnPost) {
+                            setSelectedPost(post)
+                          } else {
+                            setSelectedSavedPost(post)
+                          }
+                        }}
+                      >
+                        <Image
+                          src={getImageUrl(post.imagePath)}
+                          alt="Saved Post"
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 935px) 33vw, 310px"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6">
+                          <div className="flex items-center gap-2 text-white font-semibold">
+                            <span>❤️</span>
+                            <span>{post.reactionCount}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -451,7 +545,30 @@ export default function ProfilePage() {
       )}
 
       {selectedPost && (
-        <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} />
+        <PostDetailModal
+          post={selectedPost}
+          onClose={() => setSelectedPost(null)}
+          onEdit={handleEditPost}
+          onDelete={handleDeletePost}
+          onSendMessage={handleOpenFullMessenger}
+        />
+      )}
+
+      {editPost && (
+        <CreatePostModal
+          editPost={editPost}
+          onUpdate={handleUpdatePost}
+          onClose={() => setEditPost(null)}
+          getImageUrl={getImageUrl}
+        />
+      )}
+
+      {selectedSavedPost && (
+        <SavedPostDetailModal
+          post={selectedSavedPost}
+          onClose={() => setSelectedSavedPost(null)}
+          onSendMessage={handleOpenFullMessenger}
+        />
       )}
 
       {showCropModal && imageToCrop && (

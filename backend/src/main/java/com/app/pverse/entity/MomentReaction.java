@@ -25,7 +25,7 @@ public class MomentReaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(cascade = CascadeType.REMOVE)
     @JoinColumn(name = "moment_id", nullable = false)
     private Moment moment;
 
@@ -45,4 +45,3 @@ public class MomentReaction {
         LIKE, LOVE, HAHA, WOW, SAD, ANGRY
     }
 }
-

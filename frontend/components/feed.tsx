@@ -172,6 +172,7 @@ export function Feed({ selectedFilter }: FeedProps) {
                 image: getImageUrl(moment.imagePath),
                 username: moment.user.username
               })}
+              isSaved={moment.isSaved}
             />
           )
         })}

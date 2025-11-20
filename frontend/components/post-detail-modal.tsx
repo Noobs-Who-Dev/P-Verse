@@ -20,9 +20,11 @@ interface Reaction {
 interface PostDetailModalProps {
   post: MomentResponseDTO
   onClose: () => void
+  onEdit?: (post: MomentResponseDTO) => void
+  onDelete?: (postId: number) => void
 }
 
-export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
+export function PostDetailModal({ post, onClose, onEdit, onDelete }: PostDetailModalProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [reactions, setReactions] = useState<Reaction[]>([])
   const [loading, setLoading] = useState(false)
@@ -50,12 +52,17 @@ export function PostDetailModal({ post, onClose }: PostDetailModalProps) {
   }
 
   const handleEdit = () => {
-    console.log("Edit post:", post.id)
+    if (onEdit) {
+      onEdit(post)
+    }
   }
 
   const handleDelete = () => {
     setIsDeleting(true)
     setTimeout(() => {
+      if (onDelete) {
+        onDelete(post.id)
+      }
       onClose()
     }, 300)
   }
