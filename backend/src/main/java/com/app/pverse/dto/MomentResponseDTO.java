@@ -47,6 +47,8 @@ public class MomentResponseDTO {
 
     private String reactionType; // Loại reaction của current user (if any)
 
+    private Boolean isSaved; // Current user đã save moment này chưa
+
     /**
      * Helper để frontend format time
      * Examples: "2 hours ago", "1 day ago"

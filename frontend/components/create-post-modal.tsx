@@ -6,7 +6,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ChevronDown } from "lucide-react"
-import { createMoment, getFriends, UserSearchDto, MomentVisibility } from "@/lib/api"
+import { createMoment, updateMoment, getFriends, UserSearchDto, MomentVisibility } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 import Image from "next/image"
 
@@ -19,9 +19,12 @@ const emojiSuggestions = {
 
 interface CreatePostModalProps {
   onClose: () => void
+  editPost?: MomentResponseDTO
+  onUpdate?: (updatedPost: MomentResponseDTO) => void
+  getImageUrl?: (imagePath: string) => string
 }
 
-export function CreatePostModal({ onClose }: CreatePostModalProps) {
+export function CreatePostModal({ onClose, editPost, onUpdate, getImageUrl }: CreatePostModalProps) {
   const [caption, setCaption] = useState("")
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -32,6 +35,7 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
+  const isEditMode = !!editPost
 
   const loadFriends = async () => {
     try {
@@ -56,6 +60,26 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
   useEffect(() => {
     loadFriends()
   }, [])
+
+  // Load edit data
+  useEffect(() => {
+    if (editPost) {
+      setCaption(editPost.caption || "")
+      setImagePreview(getImageUrl ? getImageUrl(editPost.imagePath) : editPost.imagePath)
+
+      // Set visibility
+      if (editPost.visibility === "ALL_FRIENDS") {
+        setSelectedFriend({ id: "all", name: "All Friends" })
+      } else if (editPost.visibility === "PRIVATE") {
+        setSelectedFriend({ id: "private", name: "Only Me" })
+      } else if (editPost.specificUser) {
+        setSelectedFriend({
+          id: editPost.specificUser.id.toString(),
+          name: editPost.specificUser.displayName || editPost.specificUser.username
+        })
+      }
+    }
+  }, [editPost, getImageUrl])
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -105,7 +129,8 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
   }
 
   const handleShare = async () => {
-    if (!selectedImage) {
+    // In edit mode, image is optional (can keep existing image)
+    if (!isEditMode && !selectedImage) {
       toast({
         title: "No image selected",
         description: "Please select an image to share",
@@ -139,23 +164,49 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
         specificUserId = parseInt(selectedFriend.id)
       }
 
-      await createMoment({
-        image: selectedImage,
-        caption: caption || undefined,
-        visibility,
-        specificUserId
-      })
+      if (isEditMode && editPost) {
+        // Update existing post
+        const updateRequest = {
+          caption: caption || undefined,
+          visibility,
+          specificUserId
+        }
 
-      toast({
-        title: "Success!",
-        description: "Your moment has been shared",
-      })
+        // Only include image if user selected a new one
+        if (selectedImage) {
+          updateRequest.image = selectedImage
+        }
+
+        const updatedPost = await updateMoment(editPost.id, updateRequest)
+
+        toast({
+          title: "Success!",
+          description: "Your post has been updated",
+        })
+
+        if (onUpdate) {
+          onUpdate(updatedPost)
+        }
+      } else {
+        // Create new post
+        await createMoment({
+          image: selectedImage!,
+          caption: caption || undefined,
+          visibility,
+          specificUserId
+        })
+
+        toast({
+          title: "Success!",
+          description: "Your moment has been shared",
+        })
+      }
 
       onClose()
     } catch (error: any) {
-      console.error("Failed to create moment:", error)
+      console.error("Failed to create/update moment:", error)
       toast({
-        title: "Failed to share",
+        title: isEditMode ? "Failed to update" : "Failed to share",
         description: error.response?.data?.message || "Something went wrong",
         variant: "destructive"
       })
@@ -184,19 +235,21 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
           <button onClick={onClose} className="text-foreground hover:text-muted-foreground">
             <X className="w-6 h-6" />
           </button>
-          <h2 className="text-base font-semibold text-foreground">Create new post</h2>
+          <h2 className="text-base font-semibold text-foreground">
+            {isEditMode ? "Edit post" : "Create new post"}
+          </h2>
           <Button
             onClick={handleShare}
-            disabled={!selectedImage || isLoading}
+            disabled={(!selectedImage && !isEditMode) || isLoading}
             className="bg-[#0095f6] hover:bg-[#1877f2] text-white text-sm font-semibold h-auto px-4 py-1.5 disabled:opacity-50"
           >
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Sharing...
+                {isEditMode ? "Updating..." : "Sharing..."}
               </>
             ) : (
-              "Share"
+              isEditMode ? "Update" : "Share"
             )}
           </Button>
         </div>
@@ -342,4 +395,3 @@ export function CreatePostModal({ onClose }: CreatePostModalProps) {
     </div>
   )
 }
-

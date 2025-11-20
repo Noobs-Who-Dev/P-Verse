@@ -4,16 +4,19 @@ import com.app.pverse.dto.CursorPage;
 import com.app.pverse.dto.MomentResponseDTO;
 import com.app.pverse.dto.UserSummaryDTO;
 import com.app.pverse.dto.request.CreateMomentRequest;
+import com.app.pverse.dto.request.UpdateMomentRequest;
 import com.app.pverse.entity.Friendship;
 import com.app.pverse.entity.Moment;
 import com.app.pverse.entity.Moment.Visibility;
 import com.app.pverse.entity.MomentReaction;
+import com.app.pverse.entity.SavedMoment;
 import com.app.pverse.entity.User;
 import com.app.pverse.exception.InvalidVisibilityException;
 import com.app.pverse.exception.MomentNotFoundException;
 import com.app.pverse.exception.UnauthorizedAccessException;
 import com.app.pverse.repository.FriendshipRepository;
 import com.app.pverse.repository.MomentRepository;
+import com.app.pverse.repository.SavedMomentRepository;
 import com.app.pverse.repository.UserRepository;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -45,6 +48,7 @@ public class MomentService {
     private final FriendshipRepository friendshipRepository;
     private final FileStorageService fileStorageService;
     private final com.app.pverse.repository.MomentReactionRepository momentReactionRepository;
+    private final SavedMomentRepository savedMomentRepository;
 
     /**
      * Feed filter enum for different tab views
@@ -281,6 +285,74 @@ public class MomentService {
     }
 
     /**
+     * Update moment (owner only)
+     */
+    @Transactional
+    public MomentResponseDTO updateMoment(Long momentId, UpdateMomentRequest request, Long currentUserId) {
+        log.info("Updating moment: {} by user: {}", momentId, currentUserId);
+
+        Moment moment = momentRepository.findById(momentId)
+                .orElseThrow(() -> new MomentNotFoundException(momentId));
+
+        // Only owner can update
+        if (!moment.getUser().getId().equals(currentUserId)) {
+            throw new UnauthorizedAccessException("You can only update your own moments");
+        }
+
+        // Update fields
+        boolean hasChanges = false;
+
+        if (request.getCaption() != null) {
+            moment.setCaption(request.getCaption());
+            hasChanges = true;
+        }
+
+        if (request.getVisibility() != null) {
+            // Validate visibility
+            User specificUser = null;
+            if (request.getVisibility() == Visibility.SPECIFIC_PERSON) {
+                if (request.getSpecificUserId() == null) {
+                    throw new InvalidVisibilityException("specificUserId is required when visibility is SPECIFIC_PERSON");
+                }
+
+                // Validate specific user exists
+                specificUser = userRepository.findById(request.getSpecificUserId())
+                        .orElseThrow(() -> new IllegalArgumentException("Specific user not found"));
+
+                // Validate they are friends
+                if (!areFriends(currentUserId, request.getSpecificUserId())) {
+                    throw new InvalidVisibilityException("You can only share moments with your friends");
+                }
+            }
+
+            moment.setVisibility(request.getVisibility());
+            moment.setSpecificUser(specificUser);
+            hasChanges = true;
+        }
+
+        // Handle image update
+        if (request.getImage() != null) {
+            // Delete old image
+            fileStorageService.deleteFile(moment.getImagePath());
+
+            // Save new image
+            String newImagePath = fileStorageService.saveMomentImage(request.getImage(), currentUserId);
+            moment.setImagePath(newImagePath);
+            hasChanges = true;
+        }
+
+        if (!hasChanges) {
+            log.info("No changes detected for moment: {}", momentId);
+        }
+
+        // Save and return updated moment
+        Moment savedMoment = momentRepository.save(moment);
+        log.info("Moment updated successfully: {}", momentId);
+
+        return toResponseDTO(savedMoment, currentUserId);
+    }
+
+    /**
      * Validate create moment request
      */
     private void validateCreateMomentRequest(CreateMomentRequest request, MultipartFile image) {
@@ -388,6 +460,9 @@ public class MomentService {
         // Check if current user has reacted and get their reaction type
         var userReaction = momentReactionRepository.findByMomentIdAndUserId(moment.getId(), currentUserId);
 
+        // Check if current user has saved this moment
+        boolean isSaved = savedMomentRepository.existsByUserIdAndMomentId(currentUserId, moment.getId());
+
         return MomentResponseDTO.builder()
                 .id(moment.getId())
                 .user(toUserSummaryDTO(moment.getUser()))
@@ -400,6 +475,7 @@ public class MomentService {
                 .reactionCount(reactionCount)
                 .hasReacted(userReaction.isPresent())
                 .reactionType(userReaction.map(r -> r.getReactionType().name()).orElse(null))
+                .isSaved(isSaved)
                 .build();
     }
 
@@ -695,5 +771,92 @@ public class MomentService {
             case ANGRY: return "😠";
             default: return "👍";
         }
+    }
+
+    // ==================== SAVE METHODS ====================
+
+    /**
+     * Save a moment for the user
+     */
+    @Transactional
+    public void saveMoment(Long momentId, Long userId) {
+        log.info("💾 saveMoment: momentId={}, userId={}", momentId, userId);
+
+        // Verify moment exists
+        Moment moment = momentRepository.findById(momentId)
+                .orElseThrow(() -> new MomentNotFoundException(momentId));
+
+        // Verify user exists
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Check if already saved
+        if (savedMomentRepository.existsByUserIdAndMomentId(userId, momentId)) {
+            log.warn("⚠️ Moment {} already saved by user {}", momentId, userId);
+            return; // Idempotent - do nothing if already saved
+        }
+
+        // Check permission to view (user must be able to view the moment to save it)
+        if (!hasPermissionToView(moment, userId)) {
+            throw new UnauthorizedAccessException("You don't have permission to save this moment");
+        }
+
+        // Create saved moment
+        SavedMoment savedMoment = SavedMoment.builder()
+                .user(user)
+                .moment(moment)
+                .build();
+
+        savedMomentRepository.save(savedMoment);
+        log.info("✅ Moment saved successfully");
+    }
+
+    /**
+     * Unsave a moment for the user
+     */
+    @Transactional
+    public void unsaveMoment(Long momentId, Long userId) {
+        log.info("🗑️ unsaveMoment: momentId={}, userId={}", momentId, userId);
+
+        // Check if saved
+        if (!savedMomentRepository.existsByUserIdAndMomentId(userId, momentId)) {
+            log.warn("⚠️ Moment {} not saved by user {}", momentId, userId);
+            return; // Idempotent - do nothing if not saved
+        }
+
+        // Delete saved moment
+        savedMomentRepository.deleteByUserIdAndMomentId(userId, momentId);
+        log.info("✅ Moment unsaved successfully");
+    }
+
+    /**
+     * Get saved moments for a user
+     */
+    @Transactional(readOnly = true)
+    public Slice<MomentResponseDTO> getSavedMoments(Long userId, Pageable pageable) {
+        log.info("📋 getSavedMoments: userId={}, pageable={}", userId, pageable);
+
+        // Verify user exists
+        if (!userRepository.existsById(userId)) {
+            throw new IllegalArgumentException("User not found");
+        }
+
+        // Get saved moments
+        Slice<SavedMoment> savedMoments = savedMomentRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+
+        // Map to MomentResponseDTO
+        return savedMoments.map(savedMoment -> {
+            Moment moment = savedMoment.getMoment();
+            // Since user saved it, they have permission to view
+            return toResponseDTO(moment, userId);
+        });
+    }
+
+    /**
+     * Check if a moment is saved by user
+     */
+    @Transactional(readOnly = true)
+    public boolean isMomentSavedByUser(Long momentId, Long userId) {
+        return savedMomentRepository.existsByUserIdAndMomentId(userId, momentId);
     }
 }

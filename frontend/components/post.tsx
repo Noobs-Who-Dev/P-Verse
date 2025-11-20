@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useState, useEffect } from "react"
 import { PhotoEditModal } from "./photo-edit-modal"
 import { useToast } from "@/hooks/use-toast"
-import { addMomentReaction, getMyReaction, getRecentReactions, type ReactionType } from "@/lib/api"
+import { addMomentReaction, getMyReaction, getRecentReactions, saveMoment, unsaveMoment, type ReactionType } from "@/lib/api"
 import { ActivityModal } from "./activity-modal"
 
 interface PostProps {
@@ -28,6 +28,7 @@ interface PostProps {
   allowJoinIn?: boolean          // Show "Join in" button
   onActivityClick?: () => void   // Handler for Activity button
   onSendToFriends?: () => void
+  isSaved?: boolean              // Whether current user has saved this moment
 }
 
 const reactions = [
@@ -56,6 +57,7 @@ export function Post({
   allowJoinIn = false,       // NEW: Default false
   onActivityClick,           // NEW: Activity handler
   onSendToFriends,
+  isSaved = false,           // NEW: Default false
 }: PostProps) {
   const [selectedReaction, setSelectedReaction] = useState<number | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -64,10 +66,11 @@ export function Post({
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const [isActivityOpen, setIsActivityOpen] = useState(false)
   const [messageInput, setMessageInput] = useState("")
-  const [isSaved, setIsSaved] = useState(false)
+  const [isSavedState, setIsSaved] = useState(isSaved)
   const [reactionCount, setReactionCount] = useState(likes || 0)
   const [isReacting, setIsReacting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [recentReactors, setRecentReactors] = useState<Array<{
     userId: number;
     username: string;
@@ -218,6 +221,54 @@ export function Post({
     }
   }
 
+  const handleSaveClick = async () => {
+    if (!id || isSaving) return
+
+    // OPTIMISTIC UI UPDATE - Immediate feedback
+    const newSavedState = !isSavedState
+    setIsSaved(newSavedState)
+
+    setIsSaving(true)
+
+    try {
+      console.log('💾 Saving moment:', id, 'action:', newSavedState ? 'save' : 'unsave')
+
+      if (newSavedState) {
+        await saveMoment(Number(id))
+      } else {
+        await unsaveMoment(Number(id))
+      }
+
+      console.log('✅ Save action completed')
+
+      // Show success toast
+      toast({
+        title: newSavedState ? 'Moment saved!' : 'Moment unsaved',
+        description: newSavedState
+          ? 'This moment has been added to your saved collection'
+          : 'This moment has been removed from your saved collection',
+      })
+    } catch (error: any) {
+      // ERROR HANDLING - Rollback optimistic update
+      console.error('❌ Error saving moment:', error)
+
+      // Rollback to previous state
+      setIsSaved(!newSavedState)
+
+      // Show error toast
+      const status = error.response?.status
+      toast({
+        title: 'Failed to save',
+        description: status === 403
+          ? "You don't have permission to save this moment"
+          : 'Something went wrong. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const emojis = ["😊", "😂", "❤️", "👍", "🎉", "🔥", "😍", "🤔", "👏", "🙌", "💯", "✨"]
 
   const handleEmojiSelect = (emoji: string) => {
@@ -355,10 +406,10 @@ export function Post({
               variant="ghost"
               size="icon"
               className="h-12 w-12 hover:bg-muted shrink-0"
-              onClick={() => setIsSaved(!isSaved)}
-              title={isSaved ? "Unsave" : "Save"}
+              onClick={handleSaveClick}
+              title={isSavedState ? "Unsave" : "Save"}
             >
-              <Bookmark className="h-8 w-8 scale-150" fill={isSaved ? "currentColor" : "none"} />
+              <Bookmark className="h-8 w-8 scale-150" fill={isSavedState ? "currentColor" : "none"} />
             </Button>
           </div>
         </div>

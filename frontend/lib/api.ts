@@ -138,6 +138,8 @@ export interface MomentResponseDTO {
   createdAt: string;
   reactionCount: number;
   hasReacted: boolean;
+  reactionType: ReactionType | null;
+  isSaved: boolean;
 }
 
 export interface ApiResponse<T> {
@@ -399,4 +401,111 @@ export async function getMomentActivity(momentId: number): Promise<{
   }
 }
 
+// ============================================
+// MOMENT SAVE API
+// ============================================
 
+/**
+ * Save a moment
+ * POST /api/moments/{momentId}/save
+ */
+export async function saveMoment(momentId: number): Promise<void> {
+  try {
+    await axiosInstance.post(`/moments/${momentId}/save`);
+  } catch (error) {
+    console.error('[API] Save moment failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Unsave a moment
+ * DELETE /api/moments/{momentId}/save
+ */
+export async function unsaveMoment(momentId: number): Promise<void> {
+  try {
+    await axiosInstance.delete(`/moments/${momentId}/save`);
+  } catch (error) {
+    console.error('[API] Unsave moment failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get saved moments for current user
+ * GET /api/moments/saved?page=0&size=20
+ */
+export async function getSavedMoments(
+  page: number = 0,
+  size: number = 20
+): Promise<{
+  content: MomentResponseDTO[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+    sort: any;
+    offset: number;
+    paged: boolean;
+    unpaged: boolean;
+  };
+  totalPages: number;
+  totalElements: number;
+  last: boolean;
+  first: boolean;
+  numberOfElements: number;
+  size: number;
+  number: number;
+  sort: any;
+  empty: boolean;
+}> {
+  try {
+    const response = await axiosInstance.get<ApiResponse<any>>('/moments/saved', {
+      params: { page, size }
+    });
+    return response.data.data;
+  } catch (error) {
+    console.error('[API] Get saved moments failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Cập nhật moment
+ * PUT /api/moments/{id}
+ */
+export async function updateMoment(id: number, request: UpdateMomentRequest): Promise<MomentResponseDTO> {
+  try {
+    const formData = new FormData();
+
+    if (request.image) {
+      formData.append('image', request.image);
+    }
+
+    if (request.caption !== undefined) {
+      formData.append('caption', request.caption);
+    }
+
+    if (request.visibility) {
+      formData.append('visibility', request.visibility);
+    }
+
+    if (request.specificUserId) {
+      formData.append('specificUserId', request.specificUserId.toString());
+    }
+
+    const response = await axiosInstance.put<ApiResponse<MomentResponseDTO>>(
+      `/moments/${id}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+
+    return response.data.data;
+  } catch (error) {
+    console.error('[API] Update moment failed:', error);
+    throw error;
+  }
+}

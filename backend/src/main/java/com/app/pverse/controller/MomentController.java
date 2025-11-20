@@ -3,6 +3,8 @@ package com.app.pverse.controller;
 import com.app.pverse.dto.MomentResponseDTO;
 import com.app.pverse.dto.CursorPage;
 import com.app.pverse.dto.request.CreateMomentRequest;
+import com.app.pverse.dto.request.UpdateMomentRequest;
+import com.app.pverse.exception.InvalidVisibilityException;
 import com.app.pverse.dto.response.ApiResponse;
 import com.app.pverse.entity.Moment.Visibility;
 import com.app.pverse.entity.User;
@@ -293,9 +295,137 @@ public class MomentController {
                     .body(ApiResponse.error("Failed to delete moment: " + e.getMessage()));
         }
     }
+
+    /**
+     * Cập nhật moment (chỉ owner)
+     * PUT /api/moments/{id}
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<MomentResponseDTO>> updateMoment(
+            @PathVariable Long id,
+            @ModelAttribute UpdateMomentRequest request,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Updating moment: {} by user: {}", id, userId);
+
+        try {
+            // Validate request
+            if (request.getCaption() == null && request.getVisibility() == null && image == null) {
+                return ResponseEntity
+                        .status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error("At least one field must be provided for update"));
+            }
+
+            // Set image in request if provided
+            if (image != null) {
+                request.setImage(image);
+            }
+
+            MomentResponseDTO updatedMoment = momentService.updateMoment(id, request, userId);
+            return ResponseEntity.ok(ApiResponse.success("Moment updated successfully", updatedMoment));
+        } catch (MomentNotFoundException e) {
+            log.error("Moment not found", e);
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (UnauthorizedAccessException e) {
+            log.error("Unauthorized access", e);
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (InvalidVisibilityException e) {
+            log.error("Invalid visibility", e);
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error updating moment", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to update moment: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Save moment
+     * POST /api/moments/{id}/save
+     */
+    @PostMapping("/{id}/save")
+    public ResponseEntity<ApiResponse<Void>> saveMoment(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Saving moment: {} by user: {}", id, userId);
+
+        try {
+            momentService.saveMoment(id, userId);
+            return ResponseEntity.ok(ApiResponse.success("Moment saved successfully", null));
+        } catch (MomentNotFoundException e) {
+            log.error("Moment not found", e);
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (UnauthorizedAccessException e) {
+            log.error("Unauthorized access", e);
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error saving moment", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to save moment: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Unsave moment
+     * DELETE /api/moments/{id}/save
+     */
+    @DeleteMapping("/{id}/save")
+    public ResponseEntity<ApiResponse<Void>> unsaveMoment(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Unsaving moment: {} by user: {}", id, userId);
+
+        try {
+            momentService.unsaveMoment(id, userId);
+            return ResponseEntity.ok(ApiResponse.success("Moment unsaved successfully", null));
+        } catch (Exception e) {
+            log.error("Error unsaving moment", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to unsave moment: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Lấy saved moments của current user
+     * GET /api/moments/saved?page=0&size=20
+     */
+    @GetMapping("/saved")
+    public ResponseEntity<ApiResponse<Slice<MomentResponseDTO>>> getSavedMoments(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Getting saved moments for user: {}, page: {}, size: {}", userId, page, size);
+
+        try {
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            Slice<MomentResponseDTO> response = momentService.getSavedMoments(userId, pageable);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (Exception e) {
+            log.error("Error getting saved moments", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to get saved moments: " + e.getMessage()));
+        }
+    }
 }
-
-
-
-
-
