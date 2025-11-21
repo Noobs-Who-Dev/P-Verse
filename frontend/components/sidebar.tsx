@@ -19,14 +19,15 @@ import { useState } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth/authContext"
+import { useI18n } from "@/lib/i18n/I18nContext"
 
 const navItems = [
-  { icon: Home, label: "Home" },
-  { icon: Search, label: "Search" },
-  { icon: MessageCircle, label: "Messages" },
-  { icon: Heart, label: "Notifications" },
-  { icon: PlusSquare, label: "Create" },
-  { icon: User, label: "Profile" },
+  { icon: Home, label: "Home", key: "home" as const },
+  { icon: Search, label: "Search", key: "search" as const },
+  { icon: MessageCircle, label: "Messages", key: "messages" as const },
+  { icon: Heart, label: "Notifications", key: "notifications" as const },
+  { icon: PlusSquare, label: "Create", key: "createPost" as const },
+  { icon: User, label: "Profile", key: "profile" as const },
 ]
 
 interface SidebarProps {
@@ -37,6 +38,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
   const router = useRouter()
   const { logout } = useAuth()
+  const { t, language } = useI18n()
   const [activeItem, setActiveItem] = useState("Home")
   const [showMoreDropdown, setShowMoreDropdown] = useState(false)
 
@@ -87,7 +89,7 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
                 "flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-secondary transition-colors",
                 activeItem === item.label && "font-bold",
               )}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? t(item.key) : undefined}
             >
               {item.label === "Profile" ? (
                 <Avatar className="w-6 h-6">
@@ -97,7 +99,7 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
               ) : (
                 <item.icon className="w-6 h-6" strokeWidth={activeItem === item.label ? 2.5 : 2} />
               )}
-              {!collapsed && <span className="text-base">{item.label}</span>}
+              {!collapsed && <span className="text-base">{t(item.key)}</span>}
             </button>
           ))}
         </div>
@@ -110,49 +112,49 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
                 <Settings className="w-5 h-5" />
-                <span>Settings</span>
+                <span>{t('settings')}</span>
               </button>
               <button
                 onClick={() => handleMoreItemClick("Your activity")}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
                 <BarChart3 className="w-5 h-5" />
-                <span>Your activity</span>
+                <span>{language === 'vi' ? 'Hoạt động của bạn' : 'Your activity'}</span>
               </button>
               <button
                 onClick={() => handleMoreItemClick("Saved")}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
                 <Bookmark className="w-5 h-5" />
-                <span>Saved</span>
+                <span>{language === 'vi' ? 'Đã lưu' : 'Saved'}</span>
               </button>
               <button
                 onClick={() => handleMoreItemClick("Switch appearance")}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
                 <Moon className="w-5 h-5" />
-                <span>Switch appearance</span>
+                <span>{language === 'vi' ? 'Chuyển giao diện' : 'Switch appearance'}</span>
               </button>
               <button
                 onClick={() => handleMoreItemClick("Report a problem")}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
                 <AlertCircle className="w-5 h-5" />
-                <span>Report a problem</span>
+                <span>{language === 'vi' ? 'Báo cáo sự cố' : 'Report a problem'}</span>
               </button>
               <div className="border-t border-border my-1" />
               <button
                 onClick={() => handleMoreItemClick("Switch accounts")}
                 className="px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
-                <span>Switch accounts</span>
+                <span>{t('switchAccount')}</span>
               </button>
               <div className="border-t border-border" />
               <button
                 onClick={() => handleMoreItemClick("Log out")}
                 className="px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
-                <span>Log out</span>
+                <span>{t('logout')}</span>
               </button>
             </div>
           )}
@@ -160,10 +162,10 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
           <button
             onClick={() => setShowMoreDropdown(!showMoreDropdown)}
             className="flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-secondary transition-colors w-full"
-            title={collapsed ? "More" : undefined}
+            title={collapsed ? (language === 'vi' ? 'Thêm' : 'More') : undefined}
           >
             <Menu className="w-6 h-6" />
-            {!collapsed && <span className="text-base">More</span>}
+            {!collapsed && <span className="text-base">{language === 'vi' ? 'Thêm' : 'More'}</span>}
           </button>
         </div>
       </nav>

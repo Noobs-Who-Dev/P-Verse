@@ -19,13 +19,6 @@ import {
   Info,
   ChevronRight,
   ChevronLeft,
-  Search,
-  MoreVertical,
-  UserMinus,
-  Ban,
-  MessageCircle,
-  UserCheck,
-  UserX,
   X,
   Smartphone,
   Trash2,
@@ -49,48 +42,53 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useEffect, useState, useRef } from 'react';
 import { settingsService } from '@/app/(protected)/services/settingsService';
 import { profileService } from '@/lib/services/profileService';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/lib/auth/authContext';
+import { useI18n } from '@/lib/i18n/I18nContext';
 import { FriendsListDetail } from '@/components/settings/friends-list-detail';
 import { FriendRequestsDetail } from '@/components/settings/friend-requests-detail';
 import { SentRequestsDetail } from '@/components/settings/sent-requests-detail';
 
-const settingsCategories = [
-  {
-    title: "App Settings",
-    items: [
-      { id: "account", label: "Account", icon: User },
-      { id: "social", label: "Social", icon: Users },
-      { id: "notifications", label: "Notifications", icon: Bell },
-      { id: "appearance", label: "Appearance & Experience", icon: Palette },
-    ],
-  },
-  {
-    title: "Feature Settings",
-    items: [
-      { id: "moments", label: "Moments & Capture", icon: Camera },
-      { id: "smart-context", label: "Smart Context", icon: Sparkles },
-      { id: "interaction-tools", label: "Direct Interaction Tools", icon: Zap },
-    ],
-  },
-  {
-    title: "Advanced & Support",
-    items: [
-      { id: "startup", label: "Startup & Performance", icon: Rocket },
-      { id: "about", label: "About", icon: Info },
-    ],
-  },
-]
 
 export default function SettingsPage() {
   // ✅ Lấy userId từ user đã login (AuthContext)
   const { user, isLoading: authLoading } = useAuth();
   const userId = user?.id; // Dynamic userId from authenticated user
+
+  // ✅ Use i18n context for language
+  const { language, setLanguage, t } = useI18n();
+
+  // Settings categories with translations
+  const settingsCategories = [
+    {
+      title: t('appSettings'),
+      items: [
+        { id: "account", label: t('account'), icon: User },
+        { id: "social", label: t('social'), icon: Users },
+        { id: "notifications", label: t('notifications'), icon: Bell },
+        { id: "appearance", label: t('appearance'), icon: Palette },
+      ],
+    },
+    {
+      title: t('featureSettings'),
+      items: [
+        { id: "moments", label: t('moments'), icon: Camera },
+        { id: "smart-context", label: t('smartContext'), icon: Sparkles },
+        { id: "interaction-tools", label: t('interactionTools'), icon: Zap },
+      ],
+    },
+    {
+      title: t('advancedSupport'),
+      items: [
+        { id: "startup", label: t('startup'), icon: Rocket },
+        { id: "about", label: t('about'), icon: Info },
+      ],
+    },
+  ];
 
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter()
@@ -104,10 +102,8 @@ export default function SettingsPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activePanel, setActivePanel] = useState<"search" | "notifications" | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [selectedFriend, setSelectedFriend] = useState<string>("All")
   const [searchQuery, setSearchQuery] = useState("")
   const [emailRevealed, setEmailRevealed] = useState(false)
-  const [language, setLanguage] = useState("en")
 
   // Ref to track if component has mounted and settings loaded
   const hasLoadedSettings = useRef(false);
@@ -155,7 +151,7 @@ export default function SettingsPage() {
     ],
   })
 
-  const [interactionToolsSettings, setInteractionToolsSettings] = useState({
+  const [interactionToolsSettings] = useState({
     showSticker: true,
     showPinNotes: true,
     showVoiceFeedback: true,
@@ -243,8 +239,10 @@ export default function SettingsPage() {
         const themeValue = data.theme?.toLowerCase() || 'light';
         setTheme(themeValue);
 
-        if (data.language === 'VI') setLanguage('vi');
-        if (data.language === 'EN') setLanguage('en');
+        // Sync language with i18n context
+        const backendLang = data.language === 'VI' ? 'vi' : 'en';
+        setLanguage(backendLang as 'vi' | 'en');
+
         if (data.notificationsEnabled !== undefined) {
           setNotificationSettings(prev => ({
             ...prev,
@@ -255,11 +253,11 @@ export default function SettingsPage() {
         // Save original settings
         setOriginalSettings({
           theme: themeValue,
-          language: data.language === 'VI' ? 'vi' : 'en',
+          language: backendLang,
           notificationsEnabled: data.notificationsEnabled || false
         });
 
-        console.log('[Settings] Loaded:', { theme: themeValue, language: data.language });
+        console.log('[Settings] Loaded:', { theme: themeValue, language: backendLang });
         setIsLoading(false);
         hasLoadedSettings.current = true; // Mark as loaded
       } catch (error) {
@@ -390,7 +388,7 @@ export default function SettingsPage() {
     if (originalSettings.theme) {
       setTheme(originalSettings.theme);
     }
-    setLanguage(originalSettings.language);
+    setLanguage(originalSettings.language as 'vi' | 'en');
     setNotificationSettings(prev => ({
       ...prev,
       desktopNotifications: originalSettings.notificationsEnabled
@@ -635,9 +633,9 @@ export default function SettingsPage() {
         <div className="border border-border rounded-xl p-6 bg-card">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="text-base font-semibold mb-1">Enable Desktop Notifications</h3>
+              <h3 className="text-base font-semibold mb-1">{t('desktopNotifications')}</h3>
               <p className="text-sm text-muted-foreground">
-                Receive notifications on your desktop when you're not actively using the app.
+                {t('desktopNotificationsDesc')}
               </p>
             </div>
             <Switch
@@ -651,13 +649,13 @@ export default function SettingsPage() {
 
         {/* Detailed Notification Settings */}
         <div className="border border-border rounded-xl p-6 bg-card space-y-6">
-          <h3 className="text-lg font-semibold mb-4">Notification Details</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('notificationDetails')}</h3>
 
           {/* New Moments */}
           <div className="flex items-start justify-between pb-6 border-b border-border">
             <div className="flex-1">
-              <h4 className="text-base font-medium mb-1">New Moments from Friends</h4>
-              <p className="text-sm text-muted-foreground">Get notified when friends share new moments.</p>
+              <h4 className="text-base font-medium mb-1">{t('newMomentsFromFriends')}</h4>
+              <p className="text-sm text-muted-foreground">{t('getNotifiedWhenFriendsShare')}</p>
             </div>
             <Switch
               checked={notificationSettings.newMoments}
@@ -669,8 +667,8 @@ export default function SettingsPage() {
           <div className="pb-6 border-b border-border">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
-                <h4 className="text-base font-medium mb-1">New Chat Messages</h4>
-                <p className="text-sm text-muted-foreground">Receive notifications for new direct messages.</p>
+                <h4 className="text-base font-medium mb-1">{t('newChatMessages')}</h4>
+                <p className="text-sm text-muted-foreground">{t('receiveNotificationsForDM')}</p>
               </div>
               <Switch
                 checked={notificationSettings.newMessages}
@@ -681,7 +679,7 @@ export default function SettingsPage() {
             </div>
             {notificationSettings.newMessages && (
               <div className="flex items-center justify-between pl-4">
-                <span className="text-sm text-muted-foreground">Play sound</span>
+                <span className="text-sm text-muted-foreground">{t('playSound')}</span>
                 <Switch
                   checked={notificationSettings.newMessagesSound}
                   onCheckedChange={(checked) =>
@@ -696,8 +694,8 @@ export default function SettingsPage() {
           <div className="pb-6 border-b border-border">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
-                <h4 className="text-base font-medium mb-1">Join In Requests</h4>
-                <p className="text-sm text-muted-foreground">Get notified when someone wants to join your moment.</p>
+                <h4 className="text-base font-medium mb-1">{t('joinInRequests')}</h4>
+                <p className="text-sm text-muted-foreground">{t('getNotifiedJoinMoment')}</p>
               </div>
               <Switch
                 checked={notificationSettings.joinInRequests}
@@ -708,7 +706,7 @@ export default function SettingsPage() {
             </div>
             {notificationSettings.joinInRequests && (
               <div className="flex items-center justify-between pl-4">
-                <span className="text-sm text-muted-foreground">Play sound</span>
+                <span className="text-sm text-muted-foreground">{t('playSound')}</span>
                 <Switch
                   checked={notificationSettings.joinInRequestsSound}
                   onCheckedChange={(checked) =>
@@ -722,9 +720,9 @@ export default function SettingsPage() {
           {/* Creative Chain Requests */}
           <div className="flex items-start justify-between pb-6 border-b border-border">
             <div className="flex-1">
-              <h4 className="text-base font-medium mb-1">Creative Chain Requests</h4>
+              <h4 className="text-base font-medium mb-1">{t('creativeChainRequests')}</h4>
               <p className="text-sm text-muted-foreground">
-                Receive invitations to join creative collaboration chains.
+                {t('receiveInvitationsToJoin')}
               </p>
             </div>
             <Switch
@@ -738,9 +736,9 @@ export default function SettingsPage() {
           {/* Creative Chain Results */}
           <div className="flex items-start justify-between pb-6 border-b border-border">
             <div className="flex-1">
-              <h4 className="text-base font-medium mb-1">Creative Chain Results</h4>
+              <h4 className="text-base font-medium mb-1">{t('creativeChainResults')}</h4>
               <p className="text-sm text-muted-foreground">
-                Get notified when a creative chain you participated in is complete.
+                {t('getNotifiedChainComplete')}
               </p>
             </div>
             <Switch
@@ -754,9 +752,9 @@ export default function SettingsPage() {
           {/* Friend Endorsements */}
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h4 className="text-base font-medium mb-1">Friend Endorsement Requests</h4>
+              <h4 className="text-base font-medium mb-1">{t('friendEndorsementRequests')}</h4>
               <p className="text-sm text-muted-foreground">
-                Receive requests when someone wants you to endorse their friendship.
+                {t('receiveEndorsementRequests')}
               </p>
             </div>
             <Switch
@@ -770,14 +768,13 @@ export default function SettingsPage() {
 
         {/* Do Not Disturb */}
         <div className="border border-border rounded-xl p-6 bg-card">
-          <h3 className="text-lg font-semibold mb-4">Do Not Disturb</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('doNotDisturb')}</h3>
           <p className="text-sm text-muted-foreground mb-6">
-            Automatically disable notifications during specific hours. You won't receive any notifications during this
-            time.
+            {t('autoDisableNotifications')}
           </p>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm text-muted-foreground mb-2 block">Start time</label>
+              <label className="text-sm text-muted-foreground mb-2 block">{t('startTime')}</label>
               <Select
                 value={notificationSettings.doNotDisturbStart}
                 onValueChange={(value) =>
@@ -800,7 +797,7 @@ export default function SettingsPage() {
               </Select>
             </div>
             <div>
-              <label className="text-sm text-muted-foreground mb-2 block">End time</label>
+              <label className="text-sm text-muted-foreground mb-2 block">{t('endTime')}</label>
               <Select
                 value={notificationSettings.doNotDisturbEnd}
                 onValueChange={(value) => setNotificationSettings({ ...notificationSettings, doNotDisturbEnd: value })}
@@ -837,14 +834,14 @@ export default function SettingsPage() {
           <button onClick={() => setDetailView(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
             <ChevronLeft className="w-6 h-6" />
           </button>
-          <h2 className="text-2xl font-semibold">Blocked Users</h2>
+          <h2 className="text-2xl font-semibold">{t('blockedUsers')}</h2>
         </div>
 
         {/* Blocked Users List */}
         <div className="flex-1 overflow-y-auto space-y-2">
           {blockedUsers.length === 0 ? (
             <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">No blocked users</p>
+              <p className="text-muted-foreground">{t('noBlockedUsers')}</p>
             </div>
           ) : (
             blockedUsers.map((user) => (
@@ -864,7 +861,7 @@ export default function SettingsPage() {
                 </div>
                 <Button variant="outline" size="sm" className="border-border hover:bg-muted bg-transparent">
                   <X className="w-4 h-4 mr-2" />
-                  Unblock
+                  {t('unblock')}
                 </Button>
               </div>
             ))
@@ -879,15 +876,15 @@ export default function SettingsPage() {
       <div className="space-y-6">
         {/* Friends List */}
         <div className="border border-border rounded-xl p-6 bg-card space-y-4">
-          <h3 className="text-lg font-semibold mb-4">Friends List</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('friendsList')}</h3>
 
           <button
             onClick={() => setDetailView("friends-list")}
             className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-muted transition-colors border border-border"
           >
             <div className="flex-1 text-left">
-              <h4 className="text-base font-medium mb-1">View Friends List</h4>
-              <p className="text-sm text-muted-foreground">See all your current friends and manage connections.</p>
+              <h4 className="text-base font-medium mb-1">{t('viewFriendsList')}</h4>
+              <p className="text-sm text-muted-foreground">{t('seeAllCurrentFriends')}</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
           </button>
@@ -897,8 +894,8 @@ export default function SettingsPage() {
             className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-muted transition-colors border border-border"
           >
             <div className="flex-1 text-left">
-              <h4 className="text-base font-medium mb-1">Pending Friend Requests</h4>
-              <p className="text-sm text-muted-foreground">View and manage incoming friend requests.</p>
+              <h4 className="text-base font-medium mb-1">{t('pendingFriendRequests')}</h4>
+              <p className="text-sm text-muted-foreground">{t('viewManageIncomingRequests')}</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
           </button>
@@ -908,8 +905,8 @@ export default function SettingsPage() {
             className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-muted transition-colors border border-border"
           >
             <div className="flex-1 text-left">
-              <h4 className="text-base font-medium mb-1">Sent Friend Requests</h4>
-              <p className="text-sm text-muted-foreground">View and manage your sent friend requests.</p>
+              <h4 className="text-base font-medium mb-1">{t('sentFriendRequests')}</h4>
+              <p className="text-sm text-muted-foreground">{t('viewManageSentRequests')}</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
           </button>
@@ -917,10 +914,10 @@ export default function SettingsPage() {
 
         {/* Privacy */}
         <div className="border border-border rounded-xl p-6 bg-card">
-          <h3 className="text-lg font-semibold mb-4">Privacy</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('privacy')}</h3>
           <div>
-            <h4 className="text-base font-medium mb-2">Who can see my status?</h4>
-            <p className="text-sm text-muted-foreground mb-4">Control who can view your online status and activity.</p>
+            <h4 className="text-base font-medium mb-2">{t('whoCanSeeMyStatus')}</h4>
+            <p className="text-sm text-muted-foreground mb-4">{t('controlWhoCanView')}</p>
             <RadioGroup
               value={socialSettings.statusVisibility}
               onValueChange={(value) => setSocialSettings({ ...socialSettings, statusVisibility: value })}
@@ -929,24 +926,24 @@ export default function SettingsPage() {
               <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted transition-colors">
                 <RadioGroupItem value="all-friends" id="all-friends" />
                 <Label htmlFor="all-friends" className="flex-1 cursor-pointer">
-                  <div className="font-medium">All Friends</div>
+                  <div className="font-medium">{t('allFriends')}</div>
                   <div className="text-sm text-muted-foreground">
-                    Everyone on your friends list can see your status.
+                    {t('allFriendsDesc')}
                   </div>
                 </Label>
               </div>
               <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted transition-colors">
                 <RadioGroupItem value="custom-list" id="custom-list" />
                 <Label htmlFor="custom-list" className="flex-1 cursor-pointer">
-                  <div className="font-medium">Custom List Only</div>
-                  <div className="text-sm text-muted-foreground">Only selected friends can see your status.</div>
+                  <div className="font-medium">{t('customListOnly')}</div>
+                  <div className="text-sm text-muted-foreground">{t('customListDesc')}</div>
                 </Label>
               </div>
               <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted transition-colors">
                 <RadioGroupItem value="no-one" id="no-one" />
                 <Label htmlFor="no-one" className="flex-1 cursor-pointer">
-                  <div className="font-medium">No One</div>
-                  <div className="text-sm text-muted-foreground">Your status will be hidden from everyone.</div>
+                  <div className="font-medium">{t('noOne')}</div>
+                  <div className="text-sm text-muted-foreground">{t('noOneDesc')}</div>
                 </Label>
               </div>
             </RadioGroup>
@@ -955,14 +952,14 @@ export default function SettingsPage() {
 
         {/* Blocked Users */}
         <div className="border border-border rounded-xl p-6 bg-card">
-          <h3 className="text-lg font-semibold mb-4">Blocked Users</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('blockedUsers')}</h3>
           <button
             onClick={() => setDetailView("blocked-users")}
             className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-muted transition-colors border border-border"
           >
             <div className="flex-1 text-left">
-              <h4 className="text-base font-medium mb-1">Manage Blocked Users</h4>
-              <p className="text-sm text-muted-foreground">View and manage your list of blocked users.</p>
+              <h4 className="text-base font-medium mb-1">{t('manageBlockedUsers')}</h4>
+              <p className="text-sm text-muted-foreground">{t('viewManageBlockedUsers')}</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
           </button>
@@ -976,18 +973,18 @@ export default function SettingsPage() {
       <div className="space-y-6">
         {/* Personal Information */}
         <div className="border border-border rounded-xl p-6 bg-card space-y-6">
-          <h3 className="text-lg font-semibold mb-4">Personal Information</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('personalInfo')}</h3>
 
           {/* Display Name */}
           <div className="flex items-center justify-between pb-6 border-b border-border">
             <div className="flex-1">
-              <h4 className="text-base font-medium mb-1">Display Name</h4>
+              <h4 className="text-base font-medium mb-1">{t('displayName')}</h4>
               {editMode === "displayName" ? (
                 <div className="flex items-center gap-2 mt-2">
                   <Input
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
-                    placeholder="Enter display name"
+                    placeholder={t('enterDisplayName')}
                     className="max-w-xs"
                     autoFocus
                   />
@@ -997,7 +994,7 @@ export default function SettingsPage() {
                     disabled={isSavingProfile || !editValue.trim()}
                     className="bg-[#0095f6] hover:bg-[#0095f6]/90"
                   >
-                    {isSavingProfile ? "Saving..." : "Save"}
+                    {isSavingProfile ? t('saving') : t('save')}
                   </Button>
                   <Button
                     size="sm"
@@ -1005,11 +1002,11 @@ export default function SettingsPage() {
                     onClick={handleCancelEdit}
                     disabled={isSavingProfile}
                   >
-                    Cancel
+                    {t('cancel')}
                   </Button>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">{accountInfo.displayName || "Not set"}</p>
+                <p className="text-sm text-muted-foreground">{accountInfo.displayName || t('notSet')}</p>
               )}
             </div>
             {editMode !== "displayName" && (
@@ -1020,7 +1017,7 @@ export default function SettingsPage() {
                 onClick={() => handleStartEdit("displayName")}
               >
                 <Edit className="w-4 h-4 mr-2" />
-                Edit
+                {t('edit')}
               </Button>
             )}
           </div>
@@ -1028,13 +1025,13 @@ export default function SettingsPage() {
           {/* Username */}
           <div className="flex items-center justify-between pb-6 border-b border-border">
             <div className="flex-1">
-              <h4 className="text-base font-medium mb-1">Username</h4>
+              <h4 className="text-base font-medium mb-1">{t('username')}</h4>
               {editMode === "username" ? (
                 <div className="flex items-center gap-2 mt-2">
                   <Input
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
-                    placeholder="Enter username"
+                    placeholder={t('enterUsername')}
                     className="max-w-xs"
                     autoFocus
                   />
@@ -1044,7 +1041,7 @@ export default function SettingsPage() {
                     disabled={isSavingProfile || !editValue.trim()}
                     className="bg-[#0095f6] hover:bg-[#0095f6]/90"
                   >
-                    {isSavingProfile ? "Saving..." : "Save"}
+                    {isSavingProfile ? t('saving') : t('save')}
                   </Button>
                   <Button
                     size="sm"
@@ -1052,11 +1049,11 @@ export default function SettingsPage() {
                     onClick={handleCancelEdit}
                     disabled={isSavingProfile}
                   >
-                    Cancel
+                    {t('cancel')}
                   </Button>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">{accountInfo.username || "Not set"}</p>
+                <p className="text-sm text-muted-foreground">{accountInfo.username || t('notSet')}</p>
               )}
             </div>
             {editMode !== "username" && (
@@ -1067,7 +1064,7 @@ export default function SettingsPage() {
                 onClick={() => handleStartEdit("username")}
               >
                 <Edit className="w-4 h-4 mr-2" />
-                Edit
+                {t('edit')}
               </Button>
             )}
           </div>
@@ -1075,14 +1072,14 @@ export default function SettingsPage() {
           {/* Email */}
           <div className="flex items-center justify-between pb-6 border-b border-border">
             <div className="flex-1">
-              <h4 className="text-base font-medium mb-1">Email</h4>
+              <h4 className="text-base font-medium mb-1">{t('email')}</h4>
               {editMode === "email" ? (
                 <div className="flex items-center gap-2 mt-2">
                   <Input
                     type="email"
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
-                    placeholder="Enter email"
+                    placeholder={t('enterEmail')}
                     className="max-w-xs"
                     autoFocus
                   />
@@ -1092,7 +1089,7 @@ export default function SettingsPage() {
                     disabled={isSavingProfile || !editValue.trim()}
                     className="bg-[#0095f6] hover:bg-[#0095f6]/90"
                   >
-                    {isSavingProfile ? "Saving..." : "Save"}
+                    {isSavingProfile ? t('saving') : t('save')}
                   </Button>
                   <Button
                     size="sm"
@@ -1100,7 +1097,7 @@ export default function SettingsPage() {
                     onClick={handleCancelEdit}
                     disabled={isSavingProfile}
                   >
-                    Cancel
+                    {t('cancel')}
                   </Button>
                 </div>
               ) : (
@@ -1113,7 +1110,7 @@ export default function SettingsPage() {
                       onClick={() => setEmailRevealed(!emailRevealed)}
                       className="text-sm text-[#0095f6] hover:underline"
                     >
-                      {emailRevealed ? "Hide" : "Reveal"}
+                      {emailRevealed ? t('hide') : t('reveal')}
                     </button>
                   )}
                 </div>
@@ -1127,7 +1124,7 @@ export default function SettingsPage() {
                 onClick={() => handleStartEdit("email")}
               >
                 <Edit className="w-4 h-4 mr-2" />
-                Edit
+                {t('edit')}
               </Button>
             )}
           </div>
@@ -1135,13 +1132,13 @@ export default function SettingsPage() {
           {/* Bio */}
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h4 className="text-base font-medium mb-1">Bio</h4>
+              <h4 className="text-base font-medium mb-1">{t('bio')}</h4>
               {editMode === "bio" ? (
                 <div className="flex flex-col gap-2 mt-2">
                   <textarea
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
-                    placeholder="Enter bio"
+                    placeholder={t('enterBio')}
                     className="w-full max-w-lg p-2 border border-border rounded-md resize-none bg-background text-foreground"
                     rows={3}
                     maxLength={500}
@@ -1154,7 +1151,7 @@ export default function SettingsPage() {
                       disabled={isSavingProfile}
                       className="bg-[#0095f6] hover:bg-[#0095f6]/90"
                     >
-                      {isSavingProfile ? "Saving..." : "Save"}
+                      {isSavingProfile ? t('saving') : t('save')}
                     </Button>
                     <Button
                       size="sm"
@@ -1162,7 +1159,7 @@ export default function SettingsPage() {
                       onClick={handleCancelEdit}
                       disabled={isSavingProfile}
                     >
-                      Cancel
+                      {t('cancel')}
                     </Button>
                     <span className="text-xs text-muted-foreground ml-auto">
                       {editValue.length}/500
@@ -1171,7 +1168,7 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  {accountInfo.bio || "Tell us about yourself..."}
+                  {accountInfo.bio || t('tellUsAboutYourself')}
                 </p>
               )}
             </div>
@@ -1183,7 +1180,7 @@ export default function SettingsPage() {
                 onClick={() => handleStartEdit("bio")}
               >
                 <Edit className="w-4 h-4 mr-2" />
-                Edit
+                {t('edit')}
               </Button>
             )}
           </div>
@@ -1191,27 +1188,27 @@ export default function SettingsPage() {
 
         {/* Password & Authentication */}
         <div className="border border-border rounded-xl p-6 bg-card">
-          <h3 className="text-lg font-semibold mb-4">Password & Authentication</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('passwordAuthentication')}</h3>
           <Button
             className="bg-[#0095f6] hover:bg-[#0095f6]/90"
             onClick={handleOpenChangePassword}
           >
             <Key className="w-4 h-4 mr-2" />
-            Change Password
+            {t('changePassword')}
           </Button>
         </div>
 
         {/* Device Management */}
         <div className="border border-border rounded-xl p-6 bg-card">
-          <h3 className="text-lg font-semibold mb-4">Device Management</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('deviceManagement')}</h3>
           <button
             onClick={() => setDetailView("device-management")}
             className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-muted transition-colors border border-border"
           >
             <div className="flex-1 text-left">
-              <h4 className="text-base font-medium mb-1">Manage Devices</h4>
+              <h4 className="text-base font-medium mb-1">{t('manageDevices')}</h4>
               <p className="text-sm text-muted-foreground">
-                View logged-in devices and remotely log out from any device.
+                {t('viewLoggedInDevices')}
               </p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
@@ -1223,13 +1220,13 @@ export default function SettingsPage() {
           <div className="flex items-start gap-3 mb-4">
             <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-red-500 mb-2">Delete Account</h3>
+              <h3 className="text-lg font-semibold text-red-500 mb-2">{t('deleteAccount')}</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Permanently delete your account and all associated data. This action cannot be undone.
+                {t('permanentlyDeleteAccount')}
               </p>
               <Button variant="destructive" className="bg-red-500 hover:bg-red-600">
                 <Trash2 className="w-4 h-4 mr-2" />
-                Delete Account
+                {t('deleteAccount')}
               </Button>
             </div>
           </div>
@@ -1249,18 +1246,18 @@ export default function SettingsPage() {
           <button onClick={() => setDetailView(null)} className="p-2 hover:bg-muted rounded-full transition-colors">
             <ChevronLeft className="w-6 h-6" />
           </button>
-          <h2 className="text-2xl font-semibold">Device Management</h2>
+          <h2 className="text-2xl font-semibold">{t('deviceManagement')}</h2>
         </div>
 
         <p className="text-sm text-muted-foreground mb-6">
-          Manage devices where you're currently logged in. You can remotely log out from any device.
+          {t('manageDevicesDesc')}
         </p>
 
         {/* Devices List */}
         <div className="flex-1 overflow-y-auto space-y-4">
           {devices.length === 0 ? (
             <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">No devices found. Device management feature coming soon.</p>
+              <p className="text-muted-foreground">{t('noDevicesFound')}</p>
             </div>
           ) : (
             devices.map((device) => (
@@ -1272,7 +1269,7 @@ export default function SettingsPage() {
                       <div className="font-medium flex items-center gap-2">
                         {device.name}
                         {device.current && (
-                          <span className="text-xs bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full">Current</span>
+                          <span className="text-xs bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full">{t('current')}</span>
                         )}
                       </div>
                       <div className="text-sm text-muted-foreground mt-1">{device.location}</div>
@@ -1281,7 +1278,7 @@ export default function SettingsPage() {
                   </div>
                   {!device.current && (
                     <Button variant="outline" size="sm" className="border-border hover:bg-muted bg-transparent">
-                      Log Out
+                      {t('logOut')}
                     </Button>
                   )}
                 </div>
@@ -1310,8 +1307,10 @@ export default function SettingsPage() {
         <div className="border border-border rounded-xl p-6 bg-card">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="text-base font-semibold mb-1">Theme</h3>
-              <p className="text-sm text-muted-foreground">Choose between light and dark mode for the interface.</p>
+              <h3 className="text-base font-semibold mb-1">{t('theme')}</h3>
+              <p className="text-sm text-muted-foreground">
+                {t('chooseThemeDesc')}
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <Sun className="w-5 h-5 text-muted-foreground" />
@@ -1329,21 +1328,15 @@ export default function SettingsPage() {
           <div className="flex items-start gap-4">
             <Globe className="w-5 h-5 text-muted-foreground mt-1" />
             <div className="flex-1">
-              <h3 className="text-base font-semibold mb-1">Language</h3>
-              <p className="text-sm text-muted-foreground mb-4">Select your preferred display language.</p>
-              <Select value={language} onValueChange={setLanguage}>
+              <h3 className="text-base font-semibold mb-1">{t('language')}</h3>
+              <p className="text-sm text-muted-foreground mb-4">{t('languageDescription')}</p>
+              <Select value={language} onValueChange={(value) => setLanguage(value as 'vi' | 'en')}>
                 <SelectTrigger className="w-full max-w-xs bg-secondary border-border">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="vi">Tiếng Việt</SelectItem>
-                  <SelectItem value="es">Español</SelectItem>
-                  <SelectItem value="fr">Français</SelectItem>
-                  <SelectItem value="de">Deutsch</SelectItem>
-                  <SelectItem value="ja">日本語</SelectItem>
-                  <SelectItem value="ko">한국어</SelectItem>
-                  <SelectItem value="zh">中文</SelectItem>
+                  <SelectItem value="en">{t('english')}</SelectItem>
+                  <SelectItem value="vi">{t('vietnamese')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1360,8 +1353,8 @@ export default function SettingsPage() {
         <div className="border border-border rounded-xl p-6 bg-card">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="text-base font-semibold mb-1">Screenshot Hotkey</h3>
-              <p className="text-sm text-muted-foreground">Customize keyboard shortcut to activate screenshot mode.</p>
+              <h3 className="text-base font-semibold mb-1">{t('screenshotHotkey')}</h3>
+              <p className="text-sm text-muted-foreground">{t('customizeKeyboardShortcut')}</p>
             </div>
           </div>
           <div className="mt-4">
@@ -1372,7 +1365,7 @@ export default function SettingsPage() {
               className="bg-secondary border-border max-w-xs"
               placeholder="e.g., Ctrl+Shift+S"
             />
-            <p className="text-xs text-muted-foreground mt-2">Press keys to record your custom hotkey</p>
+            <p className="text-xs text-muted-foreground mt-2">{t('pressKeysToRecord')}</p>
           </div>
         </div>
 
@@ -1380,9 +1373,9 @@ export default function SettingsPage() {
         <div className="border border-border rounded-xl p-6 bg-card space-y-4">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="text-base font-semibold mb-1">Save Local Copy</h3>
+              <h3 className="text-base font-semibold mb-1">{t('saveLocalCopy')}</h3>
               <p className="text-sm text-muted-foreground">
-                Automatically save a copy of captured images to a folder on your computer.
+                {t('autoSaveCapturedImages')}
               </p>
             </div>
             <Switch
@@ -1393,21 +1386,21 @@ export default function SettingsPage() {
 
           {momentsSettings.saveLocalCopy && (
             <div className="pt-4 border-t border-border">
-              <label className="text-sm text-muted-foreground mb-2 block">Save location</label>
+              <label className="text-sm text-muted-foreground mb-2 block">{t('saveLocation')}</label>
               <div className="flex gap-2">
                 <Input
                   type="text"
                   value={momentsSettings.localCopyFolder}
                   onChange={(e) => setMomentsSettings({ ...momentsSettings, localCopyFolder: e.target.value })}
                   className="bg-secondary border-border flex-1"
-                  placeholder="Select folder path"
+                  placeholder={t('selectFolderPath')}
                 />
                 <Button variant="outline" className="border-border hover:bg-muted bg-transparent">
-                  Browse
+                  {t('browse')}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Captured images will be saved to this folder automatically
+                {t('capturedImagesSaved')}
               </p>
             </div>
           )}
@@ -1423,9 +1416,9 @@ export default function SettingsPage() {
         <div className="border border-border rounded-xl p-6 bg-card">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="text-base font-semibold mb-1">Enable Context Recognition</h3>
+              <h3 className="text-base font-semibold mb-1">{t('enableContextRecognition')}</h3>
               <p className="text-sm text-muted-foreground">
-                Disable this feature completely if you don't want context detection.
+                {t('disableContextDetection')}
               </p>
             </div>
             <Switch
@@ -1440,22 +1433,22 @@ export default function SettingsPage() {
         {/* App Management */}
         {smartContextSettings.enableContextRecognition && (
           <div className="border border-border rounded-xl p-6 bg-card space-y-6">
-            <h3 className="text-lg font-semibold mb-4">App Management</h3>
+            <h3 className="text-lg font-semibold mb-4">{t('appManagement')}</h3>
             <p className="text-sm text-muted-foreground">
-              Similar to registered games in Discord. Toggle recognition for specific apps.
+              {t('similarToDiscord')}
             </p>
 
             {/* Built-in Apps */}
             <div className="space-y-3">
-              <h4 className="text-sm font-medium text-muted-foreground">Built-in Apps</h4>
+              <h4 className="text-sm font-medium text-muted-foreground">{t('builtInApps')}</h4>
 
               {/* Spotify */}
               <div className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors border border-border">
                 <div className="flex items-center gap-3">
                   <Music className="w-5 h-5 text-green-500" />
                   <div>
-                    <div className="font-medium">Spotify</div>
-                    <div className="text-xs text-muted-foreground">Music streaming service</div>
+                    <div className="font-medium">{t('spotify')}</div>
+                    <div className="text-xs text-muted-foreground">{t('musicStreamingService')}</div>
                   </div>
                 </div>
                 <Switch
@@ -1469,8 +1462,8 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-3">
                   <Gamepad2 className="w-5 h-5 text-blue-500" />
                   <div>
-                    <div className="font-medium">League of Legends</div>
-                    <div className="text-xs text-muted-foreground">Multiplayer online game</div>
+                    <div className="font-medium">{t('leagueOfLegends')}</div>
+                    <div className="text-xs text-muted-foreground">{t('multiplayerOnlineGame')}</div>
                   </div>
                 </div>
                 <Switch
@@ -1484,8 +1477,8 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-3">
                   <Gamepad2 className="w-5 h-5 text-gray-400" />
                   <div>
-                    <div className="font-medium">Steam</div>
-                    <div className="text-xs text-muted-foreground">Gaming platform</div>
+                    <div className="font-medium">{t('steam')}</div>
+                    <div className="text-xs text-muted-foreground">{t('gamingPlatform')}</div>
                   </div>
                 </div>
                 <Switch
@@ -1498,10 +1491,10 @@ export default function SettingsPage() {
             {/* Custom Apps */}
             <div className="pt-6 border-t border-border space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium text-muted-foreground">Custom Apps</h4>
+                <h4 className="text-sm font-medium text-muted-foreground">{t('customApps')}</h4>
                 <Button size="sm" variant="outline" className="border-border hover:bg-muted bg-transparent">
                   <Plus className="w-4 h-4 mr-2" />
-                  Add App
+                  {t('addApp')}
                 </Button>
               </div>
 
@@ -1512,7 +1505,7 @@ export default function SettingsPage() {
                 >
                   <div className="flex-1">
                     <div className="font-medium">{app.name}</div>
-                    <div className="text-xs text-muted-foreground">Custom application</div>
+                    <div className="text-xs text-muted-foreground">{t('customApplication')}</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Switch checked={app.enabled} />
@@ -1538,18 +1531,18 @@ export default function SettingsPage() {
       <div className="space-y-6">
         {/* Sticker Library - File Upload */}
         <div className="border border-border rounded-xl p-6 bg-card space-y-6">
-          <h3 className="text-lg font-semibold mb-4">Sticker Library</h3>
-          <p className="text-sm text-muted-foreground">Upload sticker packs to add to your library.</p>
+          <h3 className="text-lg font-semibold mb-4">{t('stickerLibrary')}</h3>
+          <p className="text-sm text-muted-foreground">{t('uploadStickerPacks')}</p>
 
           {/* File Upload Area */}
           <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-muted-foreground transition-colors cursor-pointer">
             <div className="flex flex-col items-center gap-3">
               <Sticker className="w-8 h-8 text-muted-foreground" />
               <div>
-                <p className="font-medium mb-1">Drag and drop sticker files here</p>
-                <p className="text-sm text-muted-foreground">or click to browse</p>
+                <p className="font-medium mb-1">{t('dragAndDropStickers')}</p>
+                <p className="text-sm text-muted-foreground">{t('orClickToBrowse')}</p>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">Supported formats: .zip, .png, .jpg</p>
+              <p className="text-xs text-muted-foreground mt-2">{t('supportedFormats')}</p>
             </div>
             <input type="file" multiple accept=".zip,.png,.jpg,.jpeg" className="hidden" />
           </div>
@@ -1557,7 +1550,7 @@ export default function SettingsPage() {
           {/* Installed Sticker Packs */}
           {interactionToolsSettings.stickerPacks.length > 0 && (
             <div className="pt-6 border-t border-border space-y-3">
-              <h4 className="text-sm font-medium">Installed Packs</h4>
+              <h4 className="text-sm font-medium">{t('installedPacks')}</h4>
               {interactionToolsSettings.stickerPacks.map((pack) => (
                 <div
                   key={pack.id}
@@ -1567,7 +1560,7 @@ export default function SettingsPage() {
                     <Sticker className="w-5 h-5 text-muted-foreground" />
                     <div>
                       <div className="font-medium">{pack.name}</div>
-                      <div className="text-xs text-muted-foreground">Installed</div>
+                      <div className="text-xs text-muted-foreground">{t('installed')}</div>
                     </div>
                   </div>
                   <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-500/90 hover:bg-transparent">
@@ -1589,9 +1582,9 @@ export default function SettingsPage() {
         <div className="border border-border rounded-xl p-6 bg-card">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="text-base font-semibold mb-1">Launch with Windows/macOS</h3>
+              <h3 className="text-base font-semibold mb-1">{t('launchWithOS')}</h3>
               <p className="text-sm text-muted-foreground">
-                Automatically start the application when you turn on your computer.
+                {t('autoStartApp')}
               </p>
             </div>
             <Switch
@@ -1605,9 +1598,9 @@ export default function SettingsPage() {
         <div className="border border-border rounded-xl p-6 bg-card">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="text-base font-semibold mb-1">Run in Background</h3>
+              <h3 className="text-base font-semibold mb-1">{t('runInBackground')}</h3>
               <p className="text-sm text-muted-foreground">
-                Keep the application running in the background when you close the main window.
+                {t('keepAppRunning')}
               </p>
             </div>
             <Switch
@@ -1625,14 +1618,14 @@ export default function SettingsPage() {
       <div className="space-y-6">
         {/* App Version */}
         <div className="border border-border rounded-xl p-6 bg-card">
-          <h3 className="text-lg font-semibold mb-4">App Version</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('appVersion')}</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between pb-3 border-b border-border">
-              <span className="text-sm text-muted-foreground">Version</span>
+              <span className="text-sm text-muted-foreground">{t('version')}</span>
               <span className="font-medium">{aboutSettings.version}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Build Date</span>
+              <span className="text-sm text-muted-foreground">{t('buildDate')}</span>
               <span className="font-medium">{aboutSettings.buildDate}</span>
             </div>
           </div>
@@ -1640,9 +1633,9 @@ export default function SettingsPage() {
 
         {/* Licenses */}
         <div className="border border-border rounded-xl p-6 bg-card">
-          <h3 className="text-lg font-semibold mb-4">Licenses</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('licenses')}</h3>
           <p className="text-sm text-muted-foreground mb-6">
-            Open source libraries and their licenses used in this application.
+            {t('openSourceLibraries')}
           </p>
           <div className="space-y-3">
             {aboutSettings.licenses.map((lib, index) => (
@@ -1663,9 +1656,9 @@ export default function SettingsPage() {
 
         {/* Support Contact */}
         <div className="border border-border rounded-xl p-6 bg-card">
-          <h3 className="text-lg font-semibold mb-4">Support Contact</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('supportContact')}</h3>
           <p className="text-sm text-muted-foreground mb-6">
-            Need help? Reach out to our support team through the following channels.
+            {t('needHelp')}
           </p>
           <div className="space-y-3">
             <a
@@ -1673,7 +1666,7 @@ export default function SettingsPage() {
               className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors border border-border"
             >
               <div>
-                <div className="font-medium">Email Support</div>
+                <div className="font-medium">{t('emailSupport')}</div>
                 <div className="text-sm text-[#0095f6]">{aboutSettings.supportEmail}</div>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
@@ -1685,8 +1678,8 @@ export default function SettingsPage() {
               className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors border border-border"
             >
               <div>
-                <div className="font-medium">Support Portal</div>
-                <div className="text-sm text-[#0095f6]">Visit our support website</div>
+                <div className="font-medium">{t('supportPortal')}</div>
+                <div className="text-sm text-[#0095f6]">{t('visitSupportWebsite')}</div>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
             </a>
@@ -1763,7 +1756,7 @@ export default function SettingsPage() {
             {/* Left sidebar - Settings categories */}
             <div className="w-[400px] border-r border-border overflow-y-auto bg-background">
               <div className="p-8">
-                <h1 className="text-2xl font-semibold mb-8">Settings</h1>
+                <h1 className="text-2xl font-semibold mb-8">{t('settingsTitle')}</h1>
 
                 <div className="space-y-6">
                   {settingsCategories.map((category) => (
@@ -1813,7 +1806,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between max-w-4xl mx-auto">
                       <div className="flex items-center gap-3">
                         <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                        <p className="text-sm text-muted-foreground">You have unsaved changes</p>
+                        <p className="text-sm text-muted-foreground">{t('youHaveUnsavedChanges')}</p>
                       </div>
                       <div className="flex gap-3">
                         <Button
@@ -1821,7 +1814,7 @@ export default function SettingsPage() {
                           onClick={handleCancelChanges}
                           disabled={isSaving}
                         >
-                          Cancel
+                          {t('cancel')}
                         </Button>
                         <Button
                           onClick={handleSaveChanges}
@@ -1831,12 +1824,12 @@ export default function SettingsPage() {
                           {isSaving ? (
                             <>
                               <span className="animate-spin mr-2">⏳</span>
-                              Saving...
+                              {t('saving')}
                             </>
                           ) : (
                             <>
                               <Save className="w-4 h-4 mr-2" />
-                              Save Changes
+                              {t('saveChanges')}
                             </>
                           )}
                         </Button>
@@ -1868,17 +1861,17 @@ export default function SettingsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Key className="w-5 h-5" />
-              Change Password
+              {t('changePassword')}
             </DialogTitle>
             <DialogDescription>
-              Enter your current password and choose a new password
+              {t('enterYourCurrentPassword')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             {/* Current Password */}
             <div className="space-y-2">
-              <Label htmlFor="current-password">Current Password</Label>
+              <Label htmlFor="current-password">{t('currentPassword')}</Label>
               <Input
                 id="current-password"
                 type="password"
@@ -1887,7 +1880,7 @@ export default function SettingsPage() {
                   setPasswordForm({ ...passwordForm, currentPassword: e.target.value });
                   setPasswordErrors({ ...passwordErrors, currentPassword: "" });
                 }}
-                placeholder="Enter current password"
+                placeholder={t('enterCurrentPassword')}
                 className={passwordErrors.currentPassword ? "border-red-500" : ""}
               />
               {passwordErrors.currentPassword && (
@@ -1897,7 +1890,7 @@ export default function SettingsPage() {
 
             {/* New Password */}
             <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
+              <Label htmlFor="new-password">{t('newPassword')}</Label>
               <Input
                 id="new-password"
                 type="password"
@@ -1906,21 +1899,21 @@ export default function SettingsPage() {
                   setPasswordForm({ ...passwordForm, newPassword: e.target.value });
                   setPasswordErrors({ ...passwordErrors, newPassword: "" });
                 }}
-                placeholder="Min 8 chars, 1 uppercase, 1 lowercase, 1 number"
+                placeholder={t('minPasswordRequirements')}
                 className={passwordErrors.newPassword ? "border-red-500" : ""}
               />
               {passwordErrors.newPassword ? (
                 <p className="text-sm text-red-500">{passwordErrors.newPassword}</p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và số
+                  {t('passwordMustContain')}
                 </p>
               )}
             </div>
 
             {/* Confirm Password */}
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <Label htmlFor="confirm-password">{t('confirmNewPassword')}</Label>
               <Input
                 id="confirm-password"
                 type="password"
@@ -1929,7 +1922,7 @@ export default function SettingsPage() {
                   setPasswordForm({ ...passwordForm, confirmPassword: e.target.value });
                   setPasswordErrors({ ...passwordErrors, confirmPassword: "" });
                 }}
-                placeholder="Confirm new password"
+                placeholder={t('enterConfirmPassword')}
                 className={passwordErrors.confirmPassword ? "border-red-500" : ""}
               />
               {passwordErrors.confirmPassword && (
@@ -1944,14 +1937,14 @@ export default function SettingsPage() {
               onClick={handleCloseChangePassword}
               disabled={isChangingPassword}
             >
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               onClick={handleChangePassword}
               disabled={isChangingPassword}
               className="bg-[#0095f6] hover:bg-[#0095f6]/90"
             >
-              {isChangingPassword ? "Changing..." : "Change Password"}
+              {isChangingPassword ? t('changing') : t('changePassword')}
             </Button>
           </DialogFooter>
         </DialogContent>
