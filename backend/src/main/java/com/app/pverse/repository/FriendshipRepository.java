@@ -82,6 +82,26 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
      * Đếm số lượng bạn bè (ACCEPTED) của user
      */
     @Query("SELECT COUNT(f) FROM Friendship f WHERE " +
+           "(f.user.id = :userId OR f.friend.id = :userId) " +
+           "AND f.status = 'ACCEPTED'")
+    long countFriends(@Param("userId") Long userId);
+
+    /**
+     * Kiểm tra xem 2 người có quan hệ bạn bè với trạng thái nhất định không
+     */
+    boolean existsByUserIdAndFriendIdAndStatus(Long userId, Long friendId, String status);
+
+    // Vì mối quan hệ có thể đảo ngược user/friend:
+    @org.springframework.data.jpa.repository.Query("""
+        SELECT CASE WHEN COUNT(f) > 0 THEN TRUE ELSE FALSE END
+        FROM Friendship f
+        WHERE ((f.user.id = :userId AND f.friend.id = :friendId)
+            OR (f.user.id = :friendId AND f.friend.id = :userId))
+        AND f.status = :status
+        """)
+    boolean existsFriendshipBetweenUsers(Long userId, Long friendId, String status);
+}
+
             "(f.user.id = :userId OR f.friend.id = :userId) AND f.status = 'ACCEPTED'")
     Long countFriends(@Param("userId") Long userId);
 }
