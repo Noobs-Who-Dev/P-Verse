@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils"
 import { useState } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/auth/authContext"
 
 const navItems = [
   { icon: Home, label: "Home" },
@@ -35,6 +36,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
   const router = useRouter()
+  const { logout } = useAuth()
   const [activeItem, setActiveItem] = useState("Home")
   const [showMoreDropdown, setShowMoreDropdown] = useState(false)
 
@@ -52,6 +54,8 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
       router.push("/settings")
     } else if (action === "Saved") {
       router.push("/profile") // Navigate to profile with saved tab
+    } else if (action === "Log out") {
+      logout()
     }
     // Add other actions as needed
   }

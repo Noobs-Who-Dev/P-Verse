@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { Feed } from "@/components/feed"
-import { FriendDropdown } from "@/components/friend-dropdown"
+import { FriendDropdown, FeedFilterOption } from "@/components/friend-dropdown"
 import { RightSidebar } from "@/components/right-sidebar"
 import { MessengerPopup } from "@/components/messenger-popup"
 import { SearchPanel } from "@/components/search-panel"
@@ -13,7 +13,7 @@ import { CreatePostModal } from "@/components/create-post-modal"
 
 export function InstagramLayout() {
   const router = useRouter()
-  const [selectedFriend, setSelectedFriend] = useState<string>("All")
+  const [selectedFilter, setSelectedFilter] = useState<FeedFilterOption>('all')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activePanel, setActivePanel] = useState<"search" | "notifications" | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -21,11 +21,21 @@ export function InstagramLayout() {
 
   const handleNavClick = (item: string) => {
     if (item === "Search") {
-      setSidebarCollapsed(true)
-      setActivePanel("search")
+      if (activePanel === "search") {
+        setSidebarCollapsed(false)
+        setActivePanel(null)
+      } else {
+        setSidebarCollapsed(true)
+        setActivePanel("search")
+      }
     } else if (item === "Notifications") {
-      setSidebarCollapsed(true)
-      setActivePanel("notifications")
+      if (activePanel === "notifications") {
+        setSidebarCollapsed(false)
+        setActivePanel(null)
+      } else {
+        setSidebarCollapsed(true)
+        setActivePanel("notifications")
+      }
     } else if (item === "Create") {
       setShowCreateModal(true)
     } else if (item === "Messages") {
@@ -64,11 +74,11 @@ export function InstagramLayout() {
           <div className="relative">
             <div className="sticky top-8 z-40 flex justify-center pointer-events-none">
               <div className="pointer-events-auto">
-                <FriendDropdown selectedFriend={selectedFriend} onSelectFriend={setSelectedFriend} />
+                <FriendDropdown selectedFilter={selectedFilter} onSelectFilter={setSelectedFilter} />
               </div>
             </div>
             <div className="max-w-[630px] mx-auto px-4 pt-20">
-              <Feed selectedFriend={selectedFriend} />
+              <Feed selectedFilter={selectedFilter} />
             </div>
           </div>
         </main>
@@ -85,8 +95,6 @@ export function InstagramLayout() {
       {showCreateModal && (
         <CreatePostModal
           onClose={() => setShowCreateModal(false)}
-          selectedFriend={selectedFriend}
-          onSelectFriend={setSelectedFriend}
         />
       )}
     </div>

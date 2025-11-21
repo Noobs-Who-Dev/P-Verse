@@ -128,6 +128,66 @@
   }
 }
 
+/* Account Switcher Modal - Highest priority */
+@layer utilities {
+  /* Ensure modal is always on top with extremely high z-index */
+  [data-account-switcher-modal] {
+    z-index: 99999 !important;
+    position: fixed !important;
+    isolation: isolate !important;
+  }
+
+  /* Block body scroll when modal is open */
+  body:has([data-account-switcher-modal]) {
+    overflow: hidden !important;
+    position: relative !important;
+  }
+
+  /* FORCE all elements to have z-index of 0 (below modal backdrop at 99999) */
+  body:has([data-account-switcher-modal]) *:not([data-account-switcher-modal]):not([data-account-switcher-modal] *) {
+    pointer-events: none !important;
+    user-select: none !important;
+    /* Critical: Force all elements to z-index 0 */
+    z-index: 0 !important;
+    /* Disable transitions to prevent flash/flicker */
+    transition: none !important;
+    animation: none !important;
+  }
+
+  /* Reset position for elements that might create new stacking contexts */
+  body:has([data-account-switcher-modal]) aside:not([data-account-switcher-modal] aside),
+  body:has([data-account-switcher-modal]) nav:not([data-account-switcher-modal] nav),
+  body:has([data-account-switcher-modal]) [data-radix-popper-content-wrapper]:not([data-account-switcher-modal] [data-radix-popper-content-wrapper]) {
+    z-index: 0 !important;
+    position: relative !important;
+    transition: none !important;
+    animation: none !important;
+  }
+
+  /* Ensure modal and ALL its children can be interacted with and have proper z-index */
+  [data-account-switcher-modal],
+  [data-account-switcher-modal] * {
+    pointer-events: auto !important;
+    user-select: auto !important;
+  }
+
+  /* Additional safeguards for specific high-z-index components */
+  body:has([data-account-switcher-modal]) aside,
+  body:has([data-account-switcher-modal]) nav,
+  body:has([data-account-switcher-modal]) button:not([data-account-switcher-modal] button),
+  body:has([data-account-switcher-modal]) a:not([data-account-switcher-modal] a),
+  body:has([data-account-switcher-modal]) [role="button"]:not([data-account-switcher-modal] [role="button"]),
+  body:has([data-account-switcher-modal]) [role="dialog"]:not([data-account-switcher-modal]),
+  body:has([data-account-switcher-modal]) [role="menu"]:not([data-account-switcher-modal]),
+  body:has([data-account-switcher-modal]) [data-state]:not([data-account-switcher-modal] [data-state]) {
+    pointer-events: none !important;
+    cursor: default !important;
+    z-index: 0 !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
 /* Enhanced Instagram-style scrollbar for all scrollable elements */
 /* Webkit browsers (Chrome, Safari, Edge) */
 *::-webkit-scrollbar {
@@ -212,3 +272,4 @@
 .dark .custom-scrollbar {
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
+
