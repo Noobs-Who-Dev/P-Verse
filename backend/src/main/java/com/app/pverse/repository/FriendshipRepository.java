@@ -102,6 +102,3 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
     boolean existsFriendshipBetweenUsers(Long userId, Long friendId, String status);
 }
 
-            "(f.user.id = :userId OR f.friend.id = :userId) AND f.status = 'ACCEPTED'")
-    Long countFriends(@Param("userId") Long userId);
-}

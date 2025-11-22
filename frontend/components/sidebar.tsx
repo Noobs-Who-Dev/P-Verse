@@ -12,6 +12,7 @@ import {
   BarChart3,
   Bookmark,
   Moon,
+  Sun,
   AlertCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -20,6 +21,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth/authContext"
 import { useI18n } from "@/lib/i18n/I18nContext"
+import { getAvatarUrl } from "@/lib/utils/avatar"
+import { useTheme } from "next-themes"
+import { ActivityModal } from "@/components/activity-modal"
+import { ReportProblemModal } from "@/components/report-problem-modal"
 
 const navItems = [
   { icon: Home, label: "Home", key: "home" as const },
@@ -37,10 +42,13 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
   const router = useRouter()
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
   const { t, language } = useI18n()
+  const { theme, setTheme } = useTheme()
   const [activeItem, setActiveItem] = useState("Home")
   const [showMoreDropdown, setShowMoreDropdown] = useState(false)
+  const [showActivityModal, setShowActivityModal] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
 
   const handleClick = (label: string) => {
     setActiveItem(label)
@@ -52,14 +60,23 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
 
   const handleMoreItemClick = (action: string) => {
     setShowMoreDropdown(false)
+
     if (action === "Settings") {
       router.push("/settings")
     } else if (action === "Saved") {
       router.push("/profile") // Navigate to profile with saved tab
+    } else if (action === "Switch appearance") {
+      // Toggle theme between light and dark
+      setTheme(theme === "dark" ? "light" : "dark")
+    } else if (action === "Your activity") {
+      // Open activity modal
+      setShowActivityModal(true)
+    } else if (action === "Report a problem") {
+      // Open report problem modal
+      setShowReportModal(true)
     } else if (action === "Log out") {
       logout()
     }
-    // Add other actions as needed
   }
 
   return (
@@ -93,8 +110,8 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
             >
               {item.label === "Profile" ? (
                 <Avatar className="w-6 h-6">
-                  <AvatarImage src="/placeholder.svg?height=24&width=24" />
-                  <AvatarFallback>U</AvatarFallback>
+                  <AvatarImage src={getAvatarUrl(user?.avatarUrl)} />
+                  <AvatarFallback>{user?.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
                 </Avatar>
               ) : (
                 <item.icon className="w-6 h-6" strokeWidth={activeItem === item.label ? 2.5 : 2} />
@@ -119,35 +136,32 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
                 <BarChart3 className="w-5 h-5" />
-                <span>{language === 'vi' ? 'Hoạt động của bạn' : 'Your activity'}</span>
+                <span>{t('yourActivity')}</span>
               </button>
               <button
                 onClick={() => handleMoreItemClick("Saved")}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
                 <Bookmark className="w-5 h-5" />
-                <span>{language === 'vi' ? 'Đã lưu' : 'Saved'}</span>
+                <span>{t('saved')}</span>
               </button>
               <button
                 onClick={() => handleMoreItemClick("Switch appearance")}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
-                <Moon className="w-5 h-5" />
-                <span>{language === 'vi' ? 'Chuyển giao diện' : 'Switch appearance'}</span>
+                {theme === "dark" ? (
+                  <Sun className="w-5 h-5" />
+                ) : (
+                  <Moon className="w-5 h-5" />
+                )}
+                <span>{t('switchAppearance')}</span>
               </button>
               <button
                 onClick={() => handleMoreItemClick("Report a problem")}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
                 <AlertCircle className="w-5 h-5" />
-                <span>{language === 'vi' ? 'Báo cáo sự cố' : 'Report a problem'}</span>
-              </button>
-              <div className="border-t border-border my-1" />
-              <button
-                onClick={() => handleMoreItemClick("Switch accounts")}
-                className="px-4 py-3 hover:bg-accent transition-colors w-full text-left"
-              >
-                <span>{t('switchAccount')}</span>
+                <span>{t('reportProblem')}</span>
               </button>
               <div className="border-t border-border" />
               <button
@@ -169,6 +183,18 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
           </button>
         </div>
       </nav>
+
+      {/* Activity Modal */}
+      <ActivityModal
+        isOpen={showActivityModal}
+        onClose={() => setShowActivityModal(false)}
+      />
+
+      {/* Report Problem Modal */}
+      <ReportProblemModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+      />
     </aside>
   )
 }
