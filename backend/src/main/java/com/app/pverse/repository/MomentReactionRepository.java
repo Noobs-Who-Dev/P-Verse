@@ -81,4 +81,9 @@ public interface MomentReactionRepository extends JpaRepository<MomentReaction, 
             "WHERE r.moment.id = :momentId " +
             "GROUP BY r.reactionType")
     List<Object[]> countReactionsByType(@Param("momentId") Long momentId);
+
+    /**
+     * Lấy reactions của user theo thứ tự thời gian giảm dần (for user activity)
+     */
+    List<MomentReaction> findByUserIdOrderByCreatedAtDesc(Long userId, org.springframework.data.domain.Pageable pageable);
 }

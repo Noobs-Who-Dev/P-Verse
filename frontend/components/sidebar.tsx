@@ -25,6 +25,7 @@ import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useTheme } from "next-themes"
 import { ActivityModal } from "@/components/activity-modal"
 import { ReportProblemModal } from "@/components/report-problem-modal"
+import { YourActivityModal } from "@/components/your-activity-modal"
 
 const navItems = [
   { icon: Home, label: "Home", key: "home" as const },
@@ -49,6 +50,7 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
   const [showMoreDropdown, setShowMoreDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
+  const [showYourActivityModal, setShowYourActivityModal] = useState(false)
 
   const handleClick = (label: string) => {
     setActiveItem(label)
@@ -69,8 +71,8 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
       // Toggle theme between light and dark
       setTheme(theme === "dark" ? "light" : "dark")
     } else if (action === "Your activity") {
-      // Open activity modal
-      setShowActivityModal(true)
+      // Open your activity modal
+      setShowYourActivityModal(true)
     } else if (action === "Report a problem") {
       // Open report problem modal
       setShowReportModal(true)
@@ -194,6 +196,12 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
       <ReportProblemModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
+      />
+
+      {/* Your Activity Modal */}
+      <YourActivityModal
+        isOpen={showYourActivityModal}
+        onClose={() => setShowYourActivityModal(false)}
       />
     </aside>
   )

@@ -428,4 +428,54 @@ public class MomentController {
                     .body(ApiResponse.error("Failed to get saved moments: " + e.getMessage()));
         }
     }
+
+    /**
+     * Get moments created by current user
+     * GET /api/moments/user?page=0&size=20
+     */
+    @GetMapping("/user")
+    public ResponseEntity<ApiResponse<Slice<MomentResponseDTO>>> getUserMoments(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Getting user moments for user: {}, page: {}, size: {}", userId, page, size);
+
+        try {
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            var response = momentService.getUserMoments(userId, pageable);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (Exception e) {
+            log.error("Error getting user moments", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to get user moments: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Get reactions made by current user
+     * GET /api/moments/user/reactions?page=0&size=20
+     */
+    @GetMapping("/user/reactions")
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<Map<String, Object>>>> getUserReactions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Getting user reactions for user: {}, page: {}, size: {}", userId, page, size);
+
+        try {
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            var response = momentService.getUserReactions(userId, pageable);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (Exception e) {
+            log.error("Error getting user reactions", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to get user reactions: " + e.getMessage()));
+        }
+    }
 }
