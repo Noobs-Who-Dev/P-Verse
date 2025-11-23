@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { accountSwitcherService } from '@/lib/services/accountSwitcherService';
 
 interface User {
     id: number;
@@ -17,6 +18,7 @@ interface AuthContextType {
     login: (username: string, password: string) => Promise<void>;
     register: (username: string, email: string, password: string, displayName?: string) => Promise<void>;
     logout: () => void;
+    switchAccount: (account: { id: number; username: string; displayName: string; email: string; avatarUrl?: string; token: string }) => Promise<void>;
     isAuthenticated: boolean;
     isLoading: boolean;
 }
@@ -178,6 +180,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(accessToken);
         setUser(userData);
 
+        // Save account to switcher service
+        accountSwitcherService.saveAccount({
+            id: userId,
+            username: userName,
+            displayName,
+            email,
+            avatarUrl,
+            token: accessToken
+        });
+
         console.log('[AuthProvider] Login successful at:', new Date(loginTime).toISOString());
 
         // Redirect
@@ -220,6 +232,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(accessToken);
         setUser(userData);
 
+        // Save account to switcher service
+        accountSwitcherService.saveAccount({
+            id: userId,
+            username: userName,
+            displayName: userDisplayName,
+            email: userEmail,
+            avatarUrl,
+            token: accessToken
+        });
+
         console.log('[AuthProvider] Registration successful at:', new Date(loginTime).toISOString());
 
         router.push('/');
@@ -247,6 +269,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         router.push('/login');
     };
 
+    const switchAccount = async (account: { id: number; username: string; displayName: string; email: string; avatarUrl?: string; token: string }) => {
+        console.log('[AuthProvider] Switching to account:', account.username);
+
+        const userData = {
+            id: account.id,
+            username: account.username,
+            email: account.email,
+            displayName: account.displayName,
+            avatarUrl: account.avatarUrl
+        };
+        const userDataString = JSON.stringify(userData);
+        const loginTime = Date.now();
+
+        // Update localStorage
+        localStorage.setItem('token', account.token);
+        localStorage.setItem('user', userDataString);
+        localStorage.setItem('loginTime', loginTime.toString());
+
+        // Update sessionStorage
+        sessionStorage.setItem('token', account.token);
+        sessionStorage.setItem('user', userDataString);
+        sessionStorage.setItem('pageRefreshed', 'true');
+
+        // Update cookie
+        document.cookie = `auth-token=${account.token}; path=/; max-age=86400; SameSite=Lax`;
+
+        // Update state
+        setToken(account.token);
+        setUser(userData);
+
+        console.log('[AuthProvider] Switched to account:', account.username);
+    };
+
     return (
         <AuthContext.Provider
             value={{
@@ -255,6 +310,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 login,
                 register,
                 logout,
+                switchAccount,
                 isAuthenticated: !!token,
                 isLoading,
             }}

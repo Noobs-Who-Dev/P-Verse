@@ -24,7 +24,7 @@ public class SavedMoment {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne(cascade = CascadeType.REMOVE)
+    @ManyToOne
     @JoinColumn(name = "moment_id", nullable = false)
     private Moment moment;
 

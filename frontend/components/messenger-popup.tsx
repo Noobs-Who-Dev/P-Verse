@@ -2,61 +2,9 @@
 
 import { MessageCircle, X, Maximize2, Smile, ImageIcon, Mic, ArrowLeft, Edit } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useState } from "react"
-
-const recentChats = [
-  {
-    username: "Jessica Parker",
-    avatar: "/placeholder.svg?height=56&width=56",
-    status: "Active 18h ago",
-    lastMessage: "",
-    hasCloud: true,
-  },
-  {
-    username: "Michael Chen",
-    avatar: "/placeholder.svg?height=56&width=56",
-    status: "See you tomorrow!",
-    time: "2h",
-  },
-  {
-    username: "Emma Rodriguez",
-    avatar: "/placeholder.svg?height=56&width=56",
-    status: "Reacted ❤️ to your message",
-    time: "5h",
-  },
-  {
-    username: "David Thompson",
-    avatar: "/placeholder.svg?height=56&width=56",
-    status: "That sounds amazing!",
-    time: "1d",
-  },
-  {
-    username: "Sophie Anderson",
-    avatar: "/placeholder.svg?height=56&width=56",
-    status: "You: Check out this playlist...",
-    time: "2d",
-  },
-  {
-    username: "James Wilson",
-    avatar: "/placeholder.svg?height=56&width=56",
-    status: "You: Thanks for the help!",
-    time: "3d",
-  },
-]
-
-const chatMessages = [
-  { sender: "Michael Chen", text: "Hey! How's it going?", time: "Jun 27, 2025, 6:11 PM", isOwn: false },
-  {
-    sender: "me",
-    text: "Pretty good! Just finished that project",
-    time: "Jul 30, 2025, 11:35 PM",
-    isOwn: true,
-    replyTo: "@Michael's story",
-    emoji: "🎉",
-  },
-  { sender: "Michael Chen", text: "Nice work!", time: "Jul 31, 2025, 8:13 AM", isOwn: false },
-  { sender: "Michael Chen", text: "Want to grab coffee later?", time: "Jul 31, 2025, 8:13 AM", isOwn: false },
-]
+import { useState, useEffect } from "react"
+import { friendService, type UserSearchDto } from "@/lib/services/friendService"
+import { API_BASE_URL } from "@/lib/api/axios"
 
 interface MessengerPopupProps {
   isOpen: boolean
@@ -65,11 +13,38 @@ interface MessengerPopupProps {
 }
 
 export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: MessengerPopupProps) {
-  const [selectedChat, setSelectedChat] = useState<string | null>(null)
+  const [recentChats, setRecentChats] = useState<UserSearchDto[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [selectedChat, setSelectedChat] = useState<UserSearchDto | null>(null)
   const [message, setMessage] = useState("")
 
-  const handleChatClick = (username: string) => {
-    setSelectedChat(username)
+  useEffect(() => {
+    if (isOpen) {
+      loadFriends()
+    }
+  }, [isOpen])
+
+  const loadFriends = async () => {
+    setIsLoading(true)
+    try {
+      const data = await friendService.getFriends()
+      setRecentChats(data.slice(0, 6)) // Show only first 6 friends
+    } catch (error) {
+      console.error('Failed to load friends:', error)
+      setRecentChats([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const getAvatarUrl = (avatarUrl?: string) => {
+    if (!avatarUrl) return "/placeholder-user.jpg"
+    if (avatarUrl.startsWith('http')) return avatarUrl
+    return `${API_BASE_URL}/${avatarUrl}`
+  }
+
+  const handleChatClick = (friend: UserSearchDto) => {
+    setSelectedChat(friend)
   }
 
   const handleBackToList = () => {
@@ -77,7 +52,7 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
   }
 
   const handleExpand = () => {
-    onOpenFullMessenger(selectedChat || undefined)
+    onOpenFullMessenger(selectedChat?.username)
   }
 
   if (!isOpen) {
@@ -89,9 +64,9 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
         <MessageCircle className="w-5 h-5" />
         <span className="text-sm font-semibold">Messages</span>
         <div className="flex -space-x-2">
-          {recentChats.slice(0, 3).map((chat, i) => (
-            <Avatar key={i} className="w-6 h-6 border-2 border-card">
-              <AvatarImage src={chat.avatar || "/placeholder.svg"} />
+          {recentChats.slice(0, 3).map((chat) => (
+            <Avatar key={chat.id} className="w-6 h-6 border-2 border-card">
+              <AvatarImage src={getAvatarUrl(chat.avatarUrl)} />
               <AvatarFallback>{chat.username[0].toUpperCase()}</AvatarFallback>
             </Avatar>
           ))}
@@ -101,7 +76,6 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
   }
 
   if (selectedChat) {
-    const selectedChatData = recentChats.find((c) => c.username === selectedChat)
     return (
       <div className="fixed bottom-0 right-6 w-[350px] h-[500px] bg-card border border-border rounded-t-xl shadow-2xl z-50 flex flex-col animate-in slide-in-from-bottom">
         {/* Chat Header */}
@@ -111,10 +85,10 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
               <ArrowLeft className="w-5 h-5" />
             </button>
             <Avatar className="w-8 h-8">
-              <AvatarImage src={selectedChatData?.avatar || "/placeholder.svg"} />
-              <AvatarFallback>{selectedChat[0].toUpperCase()}</AvatarFallback>
+              <AvatarImage src={getAvatarUrl(selectedChat.avatarUrl)} />
+              <AvatarFallback>{selectedChat.username[0].toUpperCase()}</AvatarFallback>
             </Avatar>
-            <span className="text-sm font-semibold">{selectedChat}</span>
+            <span className="text-sm font-semibold">{selectedChat.displayName || selectedChat.username}</span>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={handleExpand} className="text-muted-foreground hover:text-foreground">
@@ -126,47 +100,20 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
           </div>
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {chatMessages.map((msg, index) => (
-            <div key={index}>
-              {/* Timestamp */}
-              <div className="text-center text-xs text-muted-foreground mb-2">{msg.time}</div>
-
-              {/* Message */}
-              <div className={`flex gap-2 ${msg.isOwn ? "justify-end" : ""}`}>
-                {!msg.isOwn && (
-                  <Avatar className="w-7 h-7">
-                    <AvatarImage src={selectedChatData?.avatar || "/placeholder.svg"} />
-                    <AvatarFallback>{selectedChat[0].toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                )}
-                <div className={`flex flex-col ${msg.isOwn ? "items-end" : ""}`}>
-                  {msg.replyTo && <div className="text-xs text-muted-foreground mb-1">Replied to {msg.replyTo}</div>}
-                  <div
-                    className={`rounded-2xl px-4 py-2 max-w-[250px] ${msg.isOwn ? "bg-[#0095f6] text-white" : "bg-muted text-foreground"}`}
-                  >
-                    <p className="text-sm">{msg.text}</p>
-                    {msg.emoji && <span className="text-lg ml-1">{msg.emoji}</span>}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+        {/* Messages - Placeholder for now */}
+        <div className="flex-1 overflow-y-auto p-4 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground">Messages feature coming soon...</p>
         </div>
 
-        {/* Input area */}
+        {/* Input */}
         <div className="p-4 border-t border-border">
           <div className="flex items-center gap-2 bg-muted rounded-full px-4 py-2">
-            <button className="text-muted-foreground hover:text-foreground">
-              <Smile className="w-5 h-5" />
-            </button>
             <input
               type="text"
+              placeholder="Message..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Message..."
-              className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground"
+              className="flex-1 bg-transparent text-sm focus:outline-none"
             />
             <button className="text-muted-foreground hover:text-foreground">
               <Mic className="w-5 h-5" />
@@ -200,28 +147,36 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
 
       {/* Chat list */}
       <div className="flex-1 overflow-y-auto">
-        {recentChats.map((chat) => (
-          <button
-            key={chat.username}
-            onClick={() => handleChatClick(chat.username)}
-            className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors"
-          >
-            <Avatar className="w-14 h-14">
-              <AvatarImage src={chat.avatar || "/placeholder.svg"} />
-              <AvatarFallback>{chat.username[0].toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 text-left">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-sm font-semibold flex items-center gap-1">
-                  {chat.username}
-                  {chat.hasCloud && <span className="text-xs">☁️</span>}
-                </p>
-                {chat.time && <span className="text-xs text-muted-foreground">{chat.time}</span>}
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          </div>
+        ) : recentChats.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full px-8 text-center">
+            <MessageCircle className="w-12 h-12 text-muted-foreground mb-3" />
+            <p className="text-sm text-muted-foreground">No conversations yet</p>
+            <p className="text-xs text-muted-foreground mt-1">Start chatting with your friends</p>
+          </div>
+        ) : (
+          recentChats.map((chat) => (
+            <button
+              key={chat.id}
+              onClick={() => handleChatClick(chat)}
+              className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors"
+            >
+              <Avatar className="w-14 h-14">
+                <AvatarImage src={getAvatarUrl(chat.avatarUrl)} />
+                <AvatarFallback>{chat.username[0].toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 text-left">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-semibold">{chat.displayName || chat.username}</p>
+                </div>
+                <p className="text-xs text-muted-foreground truncate">@{chat.username}</p>
               </div>
-              <p className="text-xs text-muted-foreground truncate">{chat.status}</p>
-            </div>
-          </button>
-        ))}
+            </button>
+          ))
+        )}
       </div>
 
       {/* Compose button */}
