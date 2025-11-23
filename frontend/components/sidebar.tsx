@@ -26,6 +26,8 @@ import { useTheme } from "next-themes"
 import { ActivityModal } from "@/components/activity-modal"
 import { ReportProblemModal } from "@/components/report-problem-modal"
 import { YourActivityModal } from "@/components/your-activity-modal"
+import { settingsService } from "@/app/(protected)/services/settingsService"
+import { useToast } from "@/hooks/use-toast"
 
 const navItems = [
   { icon: Home, label: "Home", key: "home" as const },
@@ -46,6 +48,7 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
   const { user, logout } = useAuth()
   const { t, language } = useI18n()
   const { theme, setTheme } = useTheme()
+  const { toast } = useToast()
   const [activeItem, setActiveItem] = useState("Home")
   const [showMoreDropdown, setShowMoreDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
@@ -60,6 +63,40 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
     onNavClick(label)
   }
 
+  const handleThemeToggle = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated. Please login again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      // Toggle theme
+      const newTheme = theme === "dark" ? "light" : "dark"
+      setTheme(newTheme)
+
+      // Save to database
+      await settingsService.updateTheme(user.id, newTheme.toUpperCase())
+
+      toast({
+        title: "Success",
+        description: `Theme changed to ${newTheme} mode`,
+      })
+    } catch (error) {
+      console.error("Failed to update theme:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update theme. Please try again.",
+        variant: "destructive",
+      })
+      // Revert theme on error
+      setTheme(theme === "dark" ? "light" : "dark")
+    }
+  }
+
   const handleMoreItemClick = (action: string) => {
     setShowMoreDropdown(false)
 
@@ -68,8 +105,8 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
     } else if (action === "Saved") {
       router.push("/profile") // Navigate to profile with saved tab
     } else if (action === "Switch appearance") {
-      // Toggle theme between light and dark
-      setTheme(theme === "dark" ? "light" : "dark")
+      // Toggle theme and save to database
+      handleThemeToggle()
     } else if (action === "Your activity") {
       // Open your activity modal
       setShowYourActivityModal(true)
@@ -190,6 +227,7 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
       <ActivityModal
         isOpen={showActivityModal}
         onClose={() => setShowActivityModal(false)}
+        username={user?.username || ""}
       />
 
       {/* Report Problem Modal */}

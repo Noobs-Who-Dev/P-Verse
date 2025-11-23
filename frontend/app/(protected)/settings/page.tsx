@@ -108,14 +108,6 @@ export default function SettingsPage() {
   // Ref to track if component has mounted and settings loaded
   const hasLoadedSettings = useRef(false);
 
-  // Track pending changes for Save button
-  const [originalSettings, setOriginalSettings] = useState({
-    theme: "",
-    language: "",
-    notificationsEnabled: false
-  });
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
   const [notificationSettings, setNotificationSettings] = useState({
     desktopNotifications: false,
@@ -250,12 +242,6 @@ export default function SettingsPage() {
           }));
         }
 
-        // Save original settings
-        setOriginalSettings({
-          theme: themeValue,
-          language: backendLang,
-          notificationsEnabled: data.notificationsEnabled || false
-        });
 
         console.log('[Settings] Loaded:', { theme: themeValue, language: backendLang });
         setIsLoading(false);
@@ -307,99 +293,6 @@ export default function SettingsPage() {
     loadUserProfile();
   }, [user?.id])
 
-
-  // Track changes using nextTheme
-  useEffect(() => {
-    // Only track changes after initial load
-    if (isLoading) return;
-
-    // Wait for nextTheme to be defined
-    if (!nextTheme && !originalSettings.theme) return;
-
-    // Use current theme or default
-    const currentTheme = nextTheme || originalSettings.theme || 'light';
-
-    const themeChanged = currentTheme !== originalSettings.theme;
-    const languageChanged = language !== originalSettings.language;
-    const notificationsChanged = notificationSettings.desktopNotifications !== originalSettings.notificationsEnabled;
-
-    setHasUnsavedChanges(themeChanged || languageChanged || notificationsChanged);
-
-    console.log('[Track Changes]', {
-      currentTheme,
-      originalTheme: originalSettings.theme,
-      changed: themeChanged || languageChanged || notificationsChanged
-    });
-  }, [nextTheme, language, notificationSettings.desktopNotifications, originalSettings, isLoading]);
-
-  // Save all changes
-  const handleSaveChanges = async () => {
-    // ✅ Validate userId before saving
-    if (!userId) {
-      toast({
-        title: "Error",
-        description: "User not authenticated. Please login again.",
-        variant: "destructive",
-      });
-      router.push('/login');
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-
-      const currentTheme = nextTheme || 'light';
-      const settingsData = {
-        theme: currentTheme.toUpperCase(),
-        language: language === 'vi' ? 'VI' : 'EN',
-        notificationsEnabled: notificationSettings.desktopNotifications
-      };
-
-      console.log('[Save] Saving settings for user:', userId, settingsData);
-      await settingsService.updateSettings(userId, settingsData);
-
-      // Update original settings
-      setOriginalSettings({
-        theme: currentTheme,
-        language: language,
-        notificationsEnabled: notificationSettings.desktopNotifications
-      });
-
-      toast({
-        title: "Success",
-        description: "Settings saved successfully!",
-      });
-
-      setHasUnsavedChanges(false);
-    } catch (error) {
-      console.error('Failed to save settings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save settings. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Cancel changes
-  const handleCancelChanges = () => {
-    if (originalSettings.theme) {
-      setTheme(originalSettings.theme);
-    }
-    setLanguage(originalSettings.language as 'vi' | 'en');
-    setNotificationSettings(prev => ({
-      ...prev,
-      desktopNotifications: originalSettings.notificationsEnabled
-    }));
-    setHasUnsavedChanges(false);
-
-    toast({
-      title: "Changes discarded",
-      description: "Settings have been reset to last saved state.",
-    });
-  };
 
   // Show loading if auth or settings are still loading
   if (authLoading || isLoading) {
@@ -593,8 +486,8 @@ export default function SettingsPage() {
       setSidebarCollapsed(true)
       setActivePanel("notifications")
     } else if (item === "Create") {
-      setShowCreateModal(true)
-    } else if (item === "Messages") {
+      setShowCreateModal(true
+      )} else if (item === "Messages") {
       router.push("/messages")
     } else if (item === "Profile") {
       router.push("/profile")
@@ -1291,14 +1184,74 @@ export default function SettingsPage() {
   }
 
   const renderAppearanceSettings = () => {
-    const handleThemeToggle = (checked: boolean) => {
+    const handleThemeToggle = async (checked: boolean) => {
       const newTheme = checked ? "dark" : "light";
       console.log('[Theme Toggle] Changing theme to:', newTheme);
 
-      // Update theme using next-themes
-      setTheme(newTheme);
+      if (!userId) {
+        toast({
+          title: "Error",
+          description: "User not authenticated. Please login again.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      // Changes will be saved when user clicks "Save Changes" button
+      try {
+        // Update theme using next-themes
+        setTheme(newTheme);
+
+        // Save to database immediately
+        await settingsService.updateTheme(userId, newTheme.toUpperCase());
+
+        toast({
+          title: "Success",
+          description: `Theme changed to ${newTheme} mode`,
+        });
+      } catch (error) {
+        console.error('Failed to update theme:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update theme. Please try again.",
+          variant: "destructive",
+        });
+        // Revert theme on error
+        setTheme(newTheme === "dark" ? "light" : "dark");
+      }
+    };
+
+    const handleLanguageChange = async (newLanguage: 'vi' | 'en') => {
+      if (!userId) {
+        toast({
+          title: "Error",
+          description: "User not authenticated. Please login again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        // Update language in context
+        setLanguage(newLanguage);
+
+        // Save to database immediately
+        const backendLang = newLanguage === 'vi' ? 'VI' : 'EN';
+        await settingsService.updateLanguage(userId, backendLang);
+
+        toast({
+          title: "Success",
+          description: `Language changed to ${newLanguage === 'vi' ? 'Tiếng Việt' : 'English'}`,
+        });
+      } catch (error) {
+        console.error('Failed to update language:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update language. Please try again.",
+          variant: "destructive",
+        });
+        // Revert language on error
+        setLanguage(newLanguage === 'vi' ? 'en' : 'vi');
+      }
     };
 
     return (
@@ -1330,7 +1283,7 @@ export default function SettingsPage() {
             <div className="flex-1">
               <h3 className="text-base font-semibold mb-1">{t('language')}</h3>
               <p className="text-sm text-muted-foreground mb-4">{t('languageDescription')}</p>
-              <Select value={language} onValueChange={(value) => setLanguage(value as 'vi' | 'en')}>
+              <Select value={language} onValueChange={handleLanguageChange}>
                 <SelectTrigger className="w-full max-w-xs bg-secondary border-border">
                   <SelectValue />
                 </SelectTrigger>
@@ -1793,51 +1746,11 @@ export default function SettingsPage() {
             </div>
 
             {/* Right content - Settings detail */}
-            <div className="flex-1 overflow-y-auto bg-background relative">
-              <div className="p-8 pb-24">
+            <div className="flex-1 overflow-y-auto bg-background">
+              <div className="p-8">
                 {!detailView && <h2 className="text-2xl font-semibold mb-8">{getSelectedSettingLabel()}</h2>}
                 {renderSettingsContent()}
               </div>
-
-              {/* Sticky Save Changes Footer */}
-              {hasUnsavedChanges && (selectedSetting === "appearance" || selectedSetting === "notifications") && (
-                <div className="sticky bottom-0 left-0 right-0 bg-background border-t border-border shadow-lg">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between max-w-4xl mx-auto">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                        <p className="text-sm text-muted-foreground">{t('youHaveUnsavedChanges')}</p>
-                      </div>
-                      <div className="flex gap-3">
-                        <Button
-                          variant="outline"
-                          onClick={handleCancelChanges}
-                          disabled={isSaving}
-                        >
-                          {t('cancel')}
-                        </Button>
-                        <Button
-                          onClick={handleSaveChanges}
-                          disabled={isSaving}
-                          className="min-w-[140px]"
-                        >
-                          {isSaving ? (
-                            <>
-                              <span className="animate-spin mr-2">⏳</span>
-                              {t('saving')}
-                            </>
-                          ) : (
-                            <>
-                              <Save className="w-4 h-4 mr-2" />
-                              {t('saveChanges')}
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </main>
