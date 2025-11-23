@@ -44,7 +44,9 @@ export function RightSidebar() {
   const getAvatarUrl = (avatarUrl?: string) => {
     if (!avatarUrl) return "/placeholder-user.jpg"
     if (avatarUrl.startsWith('http')) return avatarUrl
-    return `${API_BASE_URL}/${avatarUrl}`
+    // Remove leading slash if present to avoid double slash
+    const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+    return `${API_BASE_URL}/${cleanPath}`
   }
 
   const footerLinks = [

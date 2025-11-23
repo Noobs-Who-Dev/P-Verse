@@ -51,6 +51,24 @@ public interface MomentReactionRepository extends JpaRepository<MomentReaction, 
     void deleteByMomentIdAndUserId(Long momentId, Long userId);
 
     /**
+     * Đếm tổng số reactions của user (for activity tracking)
+     */
+    @Query("SELECT COUNT(r) FROM MomentReaction r WHERE r.user = :user")
+    long countByUser(@Param("user") com.app.pverse.entity.User user);
+
+    /**
+     * Lấy reactions gần đây của user
+     */
+    @Query("SELECT r FROM MomentReaction r WHERE r.user = :user ORDER BY r.createdAt DESC")
+    List<MomentReaction> findTop10ByUserOrderByCreatedAtDesc(@Param("user") com.app.pverse.entity.User user, org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Đếm reactions của user sau một thời điểm
+     */
+    @Query("SELECT COUNT(r) FROM MomentReaction r WHERE r.user = :user AND r.createdAt > :startDate")
+    long countByUserAndCreatedAtAfter(@Param("user") com.app.pverse.entity.User user, @Param("startDate") java.time.LocalDateTime startDate);
+
+    /**
      * Lấy top 5 reactions gần đây nhất của một moment (for Activity button)
      */
     List<MomentReaction> findTop5ByMomentIdOrderByCreatedAtDesc(Long momentId);

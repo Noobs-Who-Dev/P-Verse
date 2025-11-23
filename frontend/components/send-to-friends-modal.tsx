@@ -42,7 +42,8 @@ export function SendToFriendsModal({ isOpen, onClose, image, username }: SendToF
   const getAvatarUrl = (avatarUrl?: string) => {
     if (!avatarUrl) return "/placeholder-user.jpg"
     if (avatarUrl.startsWith('http')) return avatarUrl
-    return `${API_BASE_URL}/${avatarUrl}`
+    const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+    return `${API_BASE_URL}/${cleanPath}`
   }
 
   if (!isOpen) return null
