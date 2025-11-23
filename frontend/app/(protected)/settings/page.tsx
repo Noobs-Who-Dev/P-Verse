@@ -56,7 +56,7 @@ import { SentRequestsDetail } from '@/components/settings/sent-requests-detail';
 
 export default function SettingsPage() {
   // ✅ Lấy userId từ user đã login (AuthContext)
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, refreshUser } = useAuth();
   const userId = user?.id; // Dynamic userId from authenticated user
 
   // ✅ Use i18n context for language
@@ -338,6 +338,9 @@ export default function SettingsPage() {
       updateData[editMode] = editValue;
 
       await profileService.updateProfile(updateData);
+
+      // Refresh user data in AuthContext - this will update all components
+      await refreshUser();
 
       // Update local state
       setAccountInfo(prev => ({
