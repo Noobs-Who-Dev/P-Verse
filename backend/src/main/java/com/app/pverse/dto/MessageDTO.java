@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@ToString
 public class MessageDTO {
 
     // --- Dữ liệu chung ---
@@ -27,10 +28,21 @@ public class MessageDTO {
      */
     public static MessageDTO fromEntity(com.app.pverse.entity.Message message) {
         if (message == null) return null;
+        
+        // Determine receiverId from conversation
+        Long senderId = message.getSender().getId();
+        Long receiverId;
+        if (message.getConversation().getUser1().getId().equals(senderId)) {
+            receiverId = message.getConversation().getUser2().getId();
+        } else {
+            receiverId = message.getConversation().getUser1().getId();
+        }
+        
         return MessageDTO.builder()
                 .id(message.getId())
                 .conversationId(message.getConversation().getId())
-                .senderId(message.getSender().getId())
+                .senderId(senderId)
+                .receiverId(receiverId)
                 .content(message.getContent())
                 .messageType(String.valueOf(message.getMessageType()))
                 .isRead(message.getIsRead())

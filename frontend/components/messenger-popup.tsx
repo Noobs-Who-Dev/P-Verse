@@ -1,10 +1,12 @@
 "use client"
 
-import { MessageCircle, X, Maximize2, Smile, ImageIcon, Mic, ArrowLeft, Edit } from "lucide-react"
+import { MessageCircle, X, Maximize2, Smile, ImageIcon, Mic, ArrowLeft, Edit, Send } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { friendService, type UserSearchDto } from "@/lib/services/friendService"
 import { API_BASE_URL } from "@/lib/api/axios"
+import { websocketService, type MessageData } from "@/lib/services/websocketService"
+import { messageService, type MessageDTO } from "@/lib/services/messageService"
 
 interface MessengerPopupProps {
   isOpen: boolean
@@ -17,12 +19,115 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
   const [isLoading, setIsLoading] = useState(false)
   const [selectedChat, setSelectedChat] = useState<UserSearchDto | null>(null)
   const [message, setMessage] = useState("")
+  const [messages, setMessages] = useState<MessageDTO[]>([])
+  const [conversationId, setConversationId] = useState<number | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isOpen) {
       loadFriends()
+      initializeWebSocket()
     }
   }, [isOpen])
+
+  useEffect(() => {
+    if (conversationId) {
+      console.log('📥 Loading messages for conversation:', conversationId);
+      loadMessages()
+    } else {
+      console.log('⚠️ No conversationId yet, skipping message load');
+    }
+  }, [conversationId])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  useEffect(() => {
+    // Subscribe to incoming messages
+    console.log('🎧 Setting up message listener...');
+    console.log('   Selected chat:', selectedChat?.id, selectedChat?.username);
+    console.log('   Conversation ID:', conversationId);
+
+    const unsubscribe = websocketService.onMessage((messageData: MessageData) => {
+      console.log('💬 ===== MESSAGE RECEIVED IN POPUP =====');
+      console.log('   Message:', messageData);
+      console.log('   Sender ID:', messageData.senderId);
+      console.log('   Receiver ID:', messageData.receiverId);
+      console.log('   Current selected chat ID:', selectedChat?.id);
+      console.log('   Current conversation ID:', conversationId);
+
+      // Only add message if it's for the current conversation
+      if (selectedChat &&
+          (messageData.senderId === selectedChat.id || messageData.receiverId === selectedChat.id)) {
+        console.log('✅ Message matches current chat - checking for duplicates');
+
+        setMessages(prev => {
+          // Check if message already exists (by ID)
+          if (messageData.id && prev.some(m => m.id === messageData.id)) {
+            console.log('⚠️ Message already exists, skipping duplicate');
+            return prev;
+          }
+
+          console.log('   Previous messages count:', prev.length);
+          const newMessages = [...prev, messageData as MessageDTO];
+          console.log('   New messages count:', newMessages.length);
+          return newMessages;
+        });
+
+        // Update conversationId if we don't have it yet
+        if (!conversationId && messageData.conversationId) {
+          console.log('   Setting conversation ID:', messageData.conversationId);
+          setConversationId(messageData.conversationId);
+        }
+      } else {
+        console.log('⚠️ Message does not match current chat - ignoring');
+        console.log('   Reason: selectedChat =', selectedChat?.id, ', sender =', messageData.senderId, ', receiver =', messageData.receiverId);
+      }
+      console.log('=======================================');
+    });
+
+    return () => {
+      console.log('🎧 Unsubscribing from message listener');
+      unsubscribe();
+    }
+  }, [selectedChat, conversationId])
+
+  const initializeWebSocket = () => {
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      const user = JSON.parse(userStr)
+      setCurrentUserId(user.id)
+
+      if (!websocketService.isConnected()) {
+        websocketService.connect(user.id)
+      }
+    }
+  }
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const loadMessages = async () => {
+    if (!conversationId) {
+      console.log('⚠️ loadMessages called but conversationId is null');
+      return;
+    }
+
+    console.log('📥 Loading messages from database...');
+    console.log('   Conversation ID:', conversationId);
+
+    try {
+      const response = await messageService.getMessages(conversationId, 0, 50)
+      console.log('✅ Messages loaded:', response.content.length, 'messages');
+      console.log('   Messages:', response.content);
+      setMessages(response.content)
+    } catch (error) {
+      console.error('❌ Failed to load messages:', error)
+    }
+  }
 
   const loadFriends = async () => {
     setIsLoading(true)
@@ -43,16 +148,91 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
     return `${API_BASE_URL}/${avatarUrl}`
   }
 
-  const handleChatClick = (friend: UserSearchDto) => {
+  const handleChatClick = async (friend: UserSearchDto) => {
+    console.log('💬 Chat clicked:', friend.username);
     setSelectedChat(friend)
+    setMessages([])
+
+    if (!currentUserId) {
+      console.log('❌ No currentUserId');
+      return;
+    }
+
+    console.log('🔍 Finding conversation between user', currentUserId, 'and', friend.id);
+    try {
+      // Get conversations to find the conversation ID
+      const conversations = await messageService.getUserConversations(currentUserId)
+      console.log('📋 User has', conversations.length, 'conversations');
+
+      const conversation = conversations.find(c =>
+        c.user1.id === friend.id || c.user2.id === friend.id
+      )
+
+      if (conversation) {
+        console.log('✅ Found existing conversation:', conversation.id);
+        setConversationId(conversation.id)
+        // Load messages will be called by useEffect when conversationId changes
+      } else {
+        console.log('⚠️ No conversation found - will be created on first message');
+        // No conversation yet
+        setConversationId(null)
+        setMessages([])
+      }
+    } catch (error) {
+      console.error('❌ Failed to load conversation:', error)
+    }
   }
 
   const handleBackToList = () => {
     setSelectedChat(null)
+    setMessages([])
+    setConversationId(null)
   }
 
   const handleExpand = () => {
     onOpenFullMessenger(selectedChat?.username)
+  }
+
+  const handleSendMessage = () => {
+    console.log('=== handleSendMessage called ===');
+    console.log('Message content:', message);
+    console.log('Selected chat:', selectedChat);
+    console.log('Current user ID:', currentUserId);
+    console.log('WebSocket connected:', websocketService.isConnected());
+
+    if (!message.trim()) {
+      console.log('❌ Message is empty');
+      return;
+    }
+
+    if (!selectedChat) {
+      console.log('❌ No chat selected');
+      return;
+    }
+
+    if (!currentUserId) {
+      console.log('❌ No current user ID');
+      return;
+    }
+
+    const messageData: MessageData = {
+      senderId: currentUserId,
+      receiverId: selectedChat.id,
+      content: message.trim(),
+      messageType: 'TEXT'
+    }
+
+    console.log('📤 Preparing to send message:', messageData);
+    websocketService.sendMessage(messageData)
+    console.log('✅ Message sent to WebSocket service');
+    setMessage('')
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
   }
 
   if (!isOpen) {
@@ -100,9 +280,44 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
           </div>
         </div>
 
-        {/* Messages - Placeholder for now */}
-        <div className="flex-1 overflow-y-auto p-4 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">Messages feature coming soon...</p>
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {messages.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-sm text-muted-foreground">No messages yet. Say hi! 👋</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {messages.map((msg, index) => {
+                const isOwnMessage = msg.senderId === currentUserId
+                return (
+                  <div
+                    key={msg.id || index}
+                    className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                        isOwnMessage
+                          ? 'bg-[#0095f6] text-white'
+                          : 'bg-muted text-foreground'
+                      }`}
+                    >
+                      <p className="text-sm break-words">{msg.content}</p>
+                      {msg.createdAt && (
+                        <p className="text-xs opacity-70 mt-1">
+                          {new Date(msg.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </div>
 
         {/* Input */}
@@ -113,10 +328,15 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
               placeholder="Message..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
               className="flex-1 bg-transparent text-sm focus:outline-none"
             />
-            <button className="text-muted-foreground hover:text-foreground">
-              <Mic className="w-5 h-5" />
+            <button
+              onClick={handleSendMessage}
+              disabled={!message.trim()}
+              className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+            >
+              <Send className="w-5 h-5" />
             </button>
             <button className="text-muted-foreground hover:text-foreground">
               <ImageIcon className="w-5 h-5" />

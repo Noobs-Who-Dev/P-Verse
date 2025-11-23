@@ -1,6 +1,7 @@
 package com.app.pverse.repository;
 
 import com.app.pverse.entity.Friendship;
+import com.app.pverse.entity.Friendship.FriendshipStatus;
 import com.app.pverse.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -99,9 +100,7 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
             OR (f.user.id = :friendId AND f.friend.id = :userId))
         AND f.status = :status
         """)
-    boolean existsFriendshipBetweenUsers(Long userId, Long friendId, String status);
-}
-
-            "(f.user.id = :userId OR f.friend.id = :userId) AND f.status = 'ACCEPTED'")
-    Long countFriends(@Param("userId") Long userId);
+    boolean existsFriendshipBetweenUsers(@Param("userId") Long userId,
+                                        @Param("friendId") Long friendId,
+                                        @Param("status") FriendshipStatus status);
 }

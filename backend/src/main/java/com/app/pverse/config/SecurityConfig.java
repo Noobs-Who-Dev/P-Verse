@@ -59,7 +59,11 @@ public class SecurityConfig {
         // Cho phép origins từ frontend
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
+                "http://localhost:3001",
+                "http://localhost:3002",
                 "http://127.0.0.1:3000",
+                "http://127.0.0.1:3001",
+                "http://127.0.0.1:3002",
                 "http://localhost:5173"
         ));
 
@@ -94,6 +98,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()  // Public endpoints: login, register
                 .requestMatchers("/uploads/**").permitAll()   // Public access to uploaded files (avatars, etc.)
+                .requestMatchers("/ws/**").permitAll()        // WebSocket endpoint
                 .anyRequest().authenticated()  // Tất cả các request khác phải đăng nhập
             )
             .authenticationProvider(authenticationProvider())
