@@ -383,6 +383,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(account.token);
         setUser(userData);
 
+        // Update current account ID in account switcher service
+        localStorage.setItem('current_account_id', account.id.toString());
+
         console.log('[AuthProvider] Switched to account:', account.username);
     };
 

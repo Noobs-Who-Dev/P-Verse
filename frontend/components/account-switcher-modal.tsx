@@ -14,12 +14,13 @@ interface AccountSwitcherModalProps {
 }
 
 export function AccountSwitcherModal({ isOpen, onClose }: AccountSwitcherModalProps) {
-  const { switchAccount, logout } = useAuth()
+  const { switchAccount, logout, user } = useAuth()
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([])
   const [currentAccountId, setCurrentAccountId] = useState<number | null>(null)
 
   useEffect(() => {
     if (isOpen) {
+      // Reload accounts every time modal opens
       loadSavedAccounts()
 
       // Disable body scroll when modal is open
@@ -34,11 +35,17 @@ export function AccountSwitcherModal({ isOpen, onClose }: AccountSwitcherModalPr
         document.body.style.position = ''
       }
     }
-  }, [isOpen])
+  }, [isOpen, user])
 
   const loadSavedAccounts = () => {
     const accounts = accountSwitcherService.getSavedAccounts()
-    const currentId = accountSwitcherService.getCurrentAccountId()
+    let currentId = accountSwitcherService.getCurrentAccountId()
+
+    // If no current account ID set but we have a logged-in user, sync it
+    if (!currentId && user?.id) {
+      currentId = user.id
+      localStorage.setItem('current_account_id', user.id.toString())
+    }
 
     setSavedAccounts(accounts)
     setCurrentAccountId(currentId)
@@ -61,10 +68,17 @@ export function AccountSwitcherModal({ isOpen, onClose }: AccountSwitcherModalPr
     try {
       // Switch to the account using saved token
       await switchAccount(account)
+
+      // Update current account ID immediately
+      setCurrentAccountId(account.id)
+
+      // Close modal first to show feedback
       onClose()
 
-      // Reload page to update all data
-      window.location.reload()
+      // Small delay then reload page to update all data
+      setTimeout(() => {
+        window.location.reload()
+      }, 100)
     } catch (error) {
       console.error('Failed to switch account:', error)
       alert('Không thể chuyển tài khoản. Vui lòng đăng nhập lại.')
