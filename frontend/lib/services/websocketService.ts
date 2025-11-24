@@ -27,6 +27,8 @@ class WebSocketService {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 3000;
 
+  private notificationCallbacks: ((data: any) => void)[] = [];
+
   connect(userId: number) {
     if (this.connected && this.currentUserId === userId) {
       console.log('✅ WebSocket already connected for user:', userId);
@@ -58,6 +60,7 @@ class WebSocketService {
         this.connected = true;
         this.reconnectAttempts = 0;
         this.subscribeToMessages();
+        this.subscribeToNotifications();
       },
       onStompError: (frame) => {
         console.error('❌ STOMP Error:', frame);
@@ -143,6 +146,25 @@ class WebSocketService {
     });
   }
 
+  private subscribeToNotifications() {
+    if (!this.client) return;
+
+    const topic = '/topic/notifications';
+    console.log('📡 Subscribing to notifications:', topic);
+
+    const subscription = this.client.subscribe(topic, (message: IMessage) => {
+      try {
+        const data = JSON.parse(message.body);
+        console.log('🔔 Notification received:', data);
+        this.notifyNotificationCallbacks(data);
+      } catch (error) {
+        console.error('❌ Error parsing notification:', error);
+      }
+    });
+
+    console.log('✅ Subscribed to notifications');
+  }
+
   sendMessage(message: MessageData) {
     if (!this.client || !this.connected) {
       console.error('❌ WebSocket not connected. Connection status:', this.connected);
@@ -173,6 +195,13 @@ class WebSocketService {
     this.userStatusCallbacks.push(callback);
     return () => {
       this.userStatusCallbacks = this.userStatusCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  onNotification(callback: (data: any) => void) {
+    this.notificationCallbacks.push(callback);
+    return () => {
+      this.notificationCallbacks = this.notificationCallbacks.filter(cb => cb !== callback);
     };
   }
 
@@ -207,6 +236,16 @@ class WebSocketService {
     });
   }
 
+  private notifyNotificationCallbacks(data: any) {
+    this.notificationCallbacks.forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error('❌ Error in notification callback:', error);
+      }
+    });
+  }
+
   disconnect() {
     if (this.client) {
       this.client.deactivate();
@@ -224,4 +263,3 @@ class WebSocketService {
 }
 
 export const websocketService = new WebSocketService();
-
