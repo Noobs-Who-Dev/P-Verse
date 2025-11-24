@@ -18,7 +18,14 @@ export default function AuthLayout({
     }, []);
 
     const toggleTheme = () => {
-        setTheme(theme === 'dark' ? 'light' : 'dark');
+        const newTheme = theme === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+
+        // Save theme preference to localStorage for later sync after login
+        // This will be picked up by the auth context after successful login
+        localStorage.setItem('preferredTheme', newTheme);
+
+        console.log('[Auth Layout] Theme changed to:', newTheme, '(will sync to DB after login)');
     };
 
     return (

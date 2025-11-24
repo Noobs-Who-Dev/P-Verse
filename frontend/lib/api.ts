@@ -509,3 +509,87 @@ export async function updateMoment(id: number, request: UpdateMomentRequest): Pr
     throw error;
   }
 }
+
+// ============================================
+// USER ACTIVITY API
+// ============================================
+
+/**
+ * Get moments created by current user
+ * GET /api/moments/user?page=0&size=20
+ */
+export async function getUserMoments(
+  page: number = 0,
+  size: number = 20
+): Promise<{
+  content: MomentResponseDTO[];
+  pageable: any;
+  totalPages: number;
+  totalElements: number;
+  last: boolean;
+  first: boolean;
+  numberOfElements: number;
+  size: number;
+  number: number;
+  sort: any;
+  empty: boolean;
+}> {
+  try {
+    const response = await axiosInstance.get<ApiResponse<any>>('/moments/user', {
+      params: { page, size }
+    });
+    return response.data.data;
+  } catch (error) {
+    console.error('[API] Get user moments failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get reactions made by current user
+ * GET /api/moments/user/reactions?page=0&size=20
+ */
+export async function getUserReactions(
+  page: number = 0,
+  size: number = 20
+): Promise<{
+  content: Array<{
+    id: number;
+    momentId: number;
+    momentCaption: string;
+    momentImagePath: string;
+    reactionType: ReactionType;
+    emoji: string;
+    reactedAt: string;
+  }>;
+  pageable: any;
+  totalPages: number;
+  totalElements: number;
+  last: boolean;
+  first: boolean;
+  numberOfElements: number;
+  size: number;
+  number: number;
+  sort: any;
+  empty: boolean;
+}> {
+  try {
+    const response = await axiosInstance.get<ApiResponse<any>>('/moments/user/reactions', {
+      params: { page, size }
+    });
+    return response.data.data;
+  } catch (error) {
+    console.error('[API] Get user reactions failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update moment request interface
+ */
+export interface UpdateMomentRequest {
+  image?: File;
+  caption?: string;
+  visibility?: MomentVisibility;
+  specificUserId?: number;
+}

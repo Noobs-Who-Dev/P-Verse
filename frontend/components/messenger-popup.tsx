@@ -145,7 +145,8 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
   const getAvatarUrl = (avatarUrl?: string) => {
     if (!avatarUrl) return "/placeholder-user.jpg"
     if (avatarUrl.startsWith('http')) return avatarUrl
-    return `${API_BASE_URL}/${avatarUrl}`
+    const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+    return `${API_BASE_URL}/${cleanPath}`
   }
 
   const handleChatClick = async (friend: UserSearchDto) => {

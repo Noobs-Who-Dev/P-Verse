@@ -86,6 +86,24 @@ public interface MomentRepository extends JpaRepository<Moment, Long> {
     List<Moment> findTop10ByUserIdOrderByCreatedAtDesc(Long userId);
 
     /**
+     * Lấy moments mới nhất của user theo entity (for activity tracking)
+     */
+    @Query("SELECT m FROM Moment m WHERE m.user = :user ORDER BY m.createdAt DESC")
+    List<Moment> findTop10ByUserOrderByCreatedAtDesc(@Param("user") com.app.pverse.entity.User user, org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Đếm moments của user theo entity
+     */
+    @Query("SELECT COUNT(m) FROM Moment m WHERE m.user = :user")
+    long countByUser(@Param("user") com.app.pverse.entity.User user);
+
+    /**
+     * Đếm moments của user sau một thời điểm cụ thể
+     */
+    @Query("SELECT COUNT(m) FROM Moment m WHERE m.user = :user AND m.createdAt > :startDate")
+    long countByUserAndCreatedAtAfter(@Param("user") com.app.pverse.entity.User user, @Param("startDate") java.time.LocalDateTime startDate);
+
+    /**
      * Kiểm tra user có quyền xem moment không
      */
     @Query("SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END FROM Moment m " +

@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "moments",
@@ -50,6 +51,15 @@ public class Moment {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "moment", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<MomentReaction> reactions;
+
+    @OneToMany(mappedBy = "moment", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<SavedMoment> savedMoments;
+
+    @OneToOne(mappedBy = "moment", cascade = CascadeType.REMOVE)
+    private MomentContext context;
 
     public enum Visibility {
         ALL_FRIENDS,      // Share với tất cả friends

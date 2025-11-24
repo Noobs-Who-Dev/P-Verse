@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Settings, Grid3x3, Bookmark, Camera, Trash2, X } from "lucide-react"
 import Image from "next/image"
 import { profileService } from "@/lib/services/profileService"
-import { toggleFriendRequest, unfriend, getMomentFeed, getSavedMoments, deleteMoment } from "@/lib/api"
+import { toggleFriendRequest, unfriend, getMomentFeed, getSavedMoments, deleteMoment, MomentResponseDTO } from "@/lib/api"
 import { UserProfile } from "@/lib/types/profile"
 import { useAuth } from "@/lib/auth/authContext"
 import { useToast } from "@/hooks/use-toast"
@@ -25,7 +25,7 @@ import { ImageCropModal } from "@/components/image-crop-modal"
 export default function ProfilePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, refreshUser } = useAuth()
   const { toast } = useToast()
 
   // Original states
@@ -173,6 +173,9 @@ export default function ProfilePage() {
       // Upload to server
       const updatedUser = await profileService.uploadAvatar(croppedFile)
 
+      // Refresh user data in AuthContext - this will update all components
+      await refreshUser()
+
       // Update profile with new avatar
       if (profile && targetUserId) {
         const refreshedProfile = await profileService.getUserProfile(targetUserId)
@@ -207,6 +210,9 @@ export default function ProfilePage() {
 
       // Call API to remove avatar
       await profileService.removeAvatar()
+
+      // Refresh user data in AuthContext - this will update all components
+      await refreshUser()
 
       // Refresh profile
       if (profile && targetUserId) {
@@ -332,6 +338,18 @@ export default function ProfilePage() {
 
         <main className={`flex-1 ${sidebarCollapsed ? "ml-[73px]" : "ml-[245px]"} transition-all duration-300`}>
           <div className="max-w-[935px] mx-auto px-5 py-8">
+            {/* Loading State */}
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                <p className="text-muted-foreground">Loading profile...</p>
+              </div>
+            ) : !profile ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <p className="text-muted-foreground">Profile not found</p>
+              </div>
+            ) : (
+              <>
             {/* Profile Header */}
             <div className="flex items-start gap-8 mb-11">
               {/* Avatar */}
@@ -341,8 +359,8 @@ export default function ProfilePage() {
                     <DropdownMenuTrigger asChild disabled={isUploadingAvatar}>
                       <div className="cursor-pointer group relative">
                         <Avatar className="w-[150px] h-[150px]">
-                          <AvatarImage src={getAvatarUrl(profile?.user.avatarUrl)} />
-                          <AvatarFallback>{profile?.user.displayName?.charAt(0).toUpperCase() || "JB"}</AvatarFallback>
+                          <AvatarImage src={getAvatarUrl(profile.user.avatarUrl)} />
+                          <AvatarFallback>{profile.user.displayName?.charAt(0).toUpperCase() || profile.user.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                         </Avatar>
                         {isUploadingAvatar ? (
                           <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center">
@@ -376,8 +394,8 @@ export default function ProfilePage() {
                   </DropdownMenu>
                 ) : (
                   <Avatar className="w-[150px] h-[150px]">
-                    <AvatarImage src={getAvatarUrl(profile?.user.avatarUrl)} />
-                    <AvatarFallback>{profile?.user.displayName?.charAt(0).toUpperCase() || "JB"}</AvatarFallback>
+                    <AvatarImage src={getAvatarUrl(profile.user.avatarUrl)} />
+                    <AvatarFallback>{profile.user.displayName?.charAt(0).toUpperCase() || profile.user.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                   </Avatar>
                 )}
 
@@ -395,7 +413,7 @@ export default function ProfilePage() {
               <div className="flex-1">
                 {/* Username and buttons */}
                 <div className="flex items-center gap-5 mb-5">
-                  <h2 className="text-xl">{profile?.user.username || "jbleclgt"}</h2>
+                  <h2 className="text-xl">{profile.user.username}</h2>
                   {profile?.isOwnProfile && (
                     <>
                       <Button
@@ -430,8 +448,8 @@ export default function ProfilePage() {
 
                 {/* Name */}
                 <div>
-                  <p className="font-semibold">{profile?.user.displayName || "Hoàng Nguyên"}</p>
-                  {profile?.user.bio && (
+                  <p className="font-semibold">{profile.user.displayName}</p>
+                  {profile.user.bio && (
                     <p className="text-sm text-muted-foreground mt-1">{profile.user.bio}</p>
                   )}
                 </div>
@@ -528,6 +546,8 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
+              </>
+            )}
           </div>
         </main>
       </div>
@@ -550,7 +570,6 @@ export default function ProfilePage() {
           onClose={() => setSelectedPost(null)}
           onEdit={handleEditPost}
           onDelete={handleDeletePost}
-          onSendMessage={handleOpenFullMessenger}
         />
       )}
 
