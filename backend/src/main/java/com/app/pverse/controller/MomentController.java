@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -476,6 +477,85 @@ public class MomentController {
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("Failed to get user reactions: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Lấy danh sách moments gần đây từ bạn bè cho notifications
+     * GET /api/moments/notifications/recent?limit=10
+     */
+    @GetMapping("/notifications/recent")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getRecentFriendMomentsForNotifications(
+            @RequestParam(defaultValue = "10") int limit,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Getting recent friend moments for notifications, user: {}, limit: {}", userId, limit);
+
+        try {
+            List<Map<String, Object>> response = momentService.getRecentFriendMomentsForNotifications(userId, limit);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (Exception e) {
+            log.error("Error getting recent friend moments for notifications", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to get recent friend moments: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Dismiss a notification
+     * PATCH /api/moments/notifications/{notificationId}/dismiss
+     */
+    @PatchMapping("/notifications/{notificationId}/dismiss")
+    public ResponseEntity<ApiResponse<Void>> dismissNotification(
+            @PathVariable Long notificationId,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Dismissing notification: {} for user: {}", notificationId, userId);
+
+        try {
+            momentService.dismissNotification(notificationId, userId);
+            return ResponseEntity.ok(ApiResponse.success("Notification dismissed successfully", null));
+        } catch (UnauthorizedAccessException e) {
+            log.error("Unauthorized access", e);
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error dismissing notification", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to dismiss notification: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Delete a notification (hard delete)
+     * DELETE /api/moments/notifications/{notificationId}
+     */
+    @DeleteMapping("/notifications/{notificationId}")
+    public ResponseEntity<ApiResponse<Void>> deleteNotification(
+            @PathVariable Long notificationId,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Deleting notification: {} for user: {}", notificationId, userId);
+
+        try {
+            momentService.deleteNotification(notificationId, userId);
+            return ResponseEntity.ok(ApiResponse.success("Notification deleted successfully", null));
+        } catch (UnauthorizedAccessException e) {
+            log.error("Unauthorized access", e);
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error deleting notification", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to delete notification: " + e.getMessage()));
         }
     }
 }

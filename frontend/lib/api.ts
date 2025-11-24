@@ -593,3 +593,55 @@ export interface UpdateMomentRequest {
   visibility?: MomentVisibility;
   specificUserId?: number;
 }
+
+/**
+ * Get recent friend moments for notifications
+ * GET /api/moments/notifications/recent?limit=10
+ */
+export async function getRecentFriendMomentsForNotifications(limit: number = 10): Promise<Array<{
+  notificationId: number;
+  type: string;
+  sender: UserSummaryDto;
+  moment: MomentResponseDTO;
+}>> {
+  try {
+    const response = await axiosInstance.get<ApiResponse<Array<{
+      notificationId: number;
+      type: string;
+      sender: UserSummaryDto;
+      moment: MomentResponseDTO;
+    }>>>(`/moments/notifications/recent`, {
+      params: { limit }
+    });
+    return response.data.data;
+  } catch (error) {
+    console.error('[API] Get recent friend moments for notifications failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Dismiss a notification
+ * PATCH /api/moments/notifications/{notificationId}/dismiss
+ */
+export async function dismissNotification(notificationId: number): Promise<void> {
+  try {
+    await axiosInstance.patch(`/moments/notifications/${notificationId}/dismiss`);
+  } catch (error) {
+    console.error('[API] Dismiss notification failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a notification (hard delete)
+ * DELETE /api/moments/notifications/{notificationId}
+ */
+export async function deleteNotification(notificationId: number): Promise<void> {
+  try {
+    await axiosInstance.delete(`/moments/notifications/${notificationId}`);
+  } catch (error) {
+    console.error('[API] Delete notification failed:', error);
+    throw error;
+  }
+}

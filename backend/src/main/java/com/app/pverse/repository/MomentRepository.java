@@ -145,4 +145,7 @@ public interface MomentRepository extends JpaRepository<Moment, Long> {
             @Param("currentUserId") Long currentUserId,
             Pageable pageable
     );
+
+    @Query("SELECT m FROM Moment m WHERE m.user.id IN :friendIds ORDER BY m.createdAt DESC")
+    List<Moment> findRecentMomentsFromFriends(@Param("friendIds") List<Long> friendIds, Pageable pageable);
 }
