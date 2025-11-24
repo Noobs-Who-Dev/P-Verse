@@ -1,6 +1,7 @@
-package com.app.pverse.services;
+package com.app.pverse.service;
 
 import com.app.pverse.entity.Conversation;
+import com.app.pverse.entity.Friendship;
 import com.app.pverse.entity.Message;
 import com.app.pverse.entity.User;
 import com.app.pverse.repository.ConversationRepository;
@@ -33,21 +34,33 @@ public class MessageService {
      */
     @Transactional
     public Message sendMessage(Long senderId, Long receiverId, String content, String messageType) {
+        System.out.println("\n📨 MessageService.sendMessage() called");
+        System.out.println("   Sender ID: " + senderId);
+        System.out.println("   Receiver ID: " + receiverId);
+        System.out.println("   Content: " + content);
+        System.out.println("   MessageType: " + messageType);
+
         if (senderId == null || receiverId == null)
             throw new IllegalArgumentException("senderId and receiverId cannot be null");
 
         if (senderId.equals(receiverId))
             throw new IllegalArgumentException("Cannot send message to yourself");
 
-        boolean areFriends = friendshipRepository.existsByUserIdAndFriendIdAndStatus(senderId, receiverId, "accepted")
-                || friendshipRepository.existsByUserIdAndFriendIdAndStatus(receiverId, senderId, "accepted");
+        System.out.println("🔍 Checking friendship status...");
+        boolean areFriends = friendshipRepository.existsFriendshipBetweenUsers(
+            senderId, receiverId, Friendship.FriendshipStatus.ACCEPTED);
 
-        if (!areFriends)
+        if (!areFriends) {
+            System.out.println("❌ Users are not friends!");
             throw new IllegalStateException("Two users are not friends");
+        }
+        System.out.println("✅ Users are friends");
 
         // Find or create conversation
+        System.out.println("🔍 Finding or creating conversation...");
         Conversation conversation = conversationRepository.findByUserPair(senderId, receiverId)
                 .orElseGet(() -> {
+                    System.out.println("   Creating new conversation...");
                     Long u1 = Math.min(senderId, receiverId);
                     Long u2 = Math.max(senderId, receiverId);
                     User user1 = userRepository.findById(u1)
@@ -61,26 +74,37 @@ public class MessageService {
                             .createdAt(LocalDateTime.now())
                             .lastMessageAt(LocalDateTime.now())
                             .build();
-                    return conversationRepository.save(newConvo);
+                    Conversation savedConvo = conversationRepository.save(newConvo);
+                    System.out.println("   ✅ New conversation created with ID: " + savedConvo.getId());
+                    return savedConvo;
                 });
+        System.out.println("✅ Conversation ID: " + conversation.getId());
 
+        System.out.println("🔍 Finding sender...");
         User sender = userRepository.findById(senderId)
                 .orElseThrow(() -> new IllegalArgumentException("Sender not found"));
+        System.out.println("✅ Sender found: " + sender.getUsername());
 
+        System.out.println("🔨 Building message entity...");
         Message message = Message.builder()
                 .conversation(conversation)
                 .sender(sender)
-                .messageType(Message.MessageType.valueOf(messageType != null ? messageType : "text"))
+                .messageType(Message.MessageType.valueOf(messageType != null ? messageType.toUpperCase() : "TEXT"))
                 .content(content)
                 .isRead(false)
                 .createdAt(LocalDateTime.now())
                 .build();
 
+        System.out.println("💾 Saving message to database...");
         Message saved = messageRepository.save(message);
+        System.out.println("✅ Message saved with ID: " + saved.getId());
 
+        System.out.println("🔄 Updating conversation lastMessageAt...");
         conversation.setLastMessageAt(LocalDateTime.now());
         conversationRepository.save(conversation);
+        System.out.println("✅ Conversation updated");
 
+        System.out.println("✅ MessageService.sendMessage() completed successfully\n");
         return saved;
     }
 

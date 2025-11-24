@@ -1,71 +1,223 @@
 "use client"
 
-import { ArrowLeft, Phone, Video, Info, Search, Smile, ImageIcon, Mic, Heart } from "lucide-react"
+import { ArrowLeft, Phone, Video, Info, Search, Smile, ImageIcon, Mic, Heart, Send, MessageCircle } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { SearchPanel } from "@/components/search-panel"
 import { NotificationsPanel } from "@/components/notifications-panel"
 import { CreatePostModal } from "@/components/create-post-modal"
-
-const conversations = [
-  {
-    username: "sarah_johnson",
-    avatar: "/placeholder.svg?height=56&width=56",
-    lastMessage: "See you tomorrow!",
-    time: "2m",
-    unread: 2,
-  },
-  {
-    username: "mike_chen",
-    avatar: "/placeholder.svg?height=56&width=56",
-    lastMessage: "Thanks for the help!",
-    time: "1h",
-    unread: 0,
-  },
-  {
-    username: "emma_wilson",
-    avatar: "/placeholder.svg?height=56&width=56",
-    lastMessage: "That sounds great 😊",
-    time: "3h",
-    unread: 1,
-  },
-  {
-    username: "alex_rodriguez",
-    avatar: "/placeholder.svg?height=56&width=56",
-    lastMessage: "Let's catch up soon",
-    time: "1d",
-    unread: 0,
-  },
-]
-
-const messages = [
-  { sender: "sarah_johnson", text: "Hey! How are you?", time: "10:30 AM", isOwn: false },
-  { sender: "me", text: "I'm good! Thanks for asking 😊", time: "10:32 AM", isOwn: true },
-  { sender: "sarah_johnson", text: "Want to grab coffee tomorrow?", time: "10:33 AM", isOwn: false },
-  { sender: "me", text: "What time works for you?", time: "10:35 AM", isOwn: true },
-  { sender: "sarah_johnson", text: "How about 2pm at the usual place?", time: "10:36 AM", isOwn: false },
-  { sender: "me", text: "Perfect! See you then 👍", time: "10:37 AM", isOwn: true },
-  { sender: "sarah_johnson", text: "See you tomorrow!", time: "10:38 AM", isOwn: false },
-]
+import { friendService, type UserSearchDto } from "@/lib/services/friendService"
+import { websocketService, type MessageData } from "@/lib/services/websocketService"
+import { messageService, type MessageDTO, type ConversationDTO } from "@/lib/services/messageService"
+import { API_BASE_URL } from "@/lib/api/axios"
 
 export default function MessagesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [selectedUser, setSelectedUser] = useState("sarah_johnson")
+  const [selectedUser, setSelectedUser] = useState<UserSearchDto | null>(null)
   const [message, setMessage] = useState("")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
   const [activePanel, setActivePanel] = useState<"search" | "notifications" | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [selectedFriend, setSelectedFriend] = useState<string>("All")
+  const [conversations, setConversations] = useState<ConversationDTO[]>([])
+  const [friends, setFriends] = useState<UserSearchDto[]>([])
+  const [messages, setMessages] = useState<MessageDTO[]>([])
+  const [conversationId, setConversationId] = useState<number | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const user = searchParams.get("user")
-    if (user) {
-      setSelectedUser(user)
+    initializeWebSocket()
+    loadFriendsAndConversations()
+  }, [])
+
+  useEffect(() => {
+    const username = searchParams.get("user")
+    if (username && friends.length > 0) {
+      const friend = friends.find((f) => f.username === username)
+      if (friend) {
+        handleSelectUser(friend)
+      }
     }
-  }, [searchParams])
+  }, [searchParams, friends])
+
+  useEffect(() => {
+    if (selectedUser && conversationId) {
+      loadMessages()
+    }
+  }, [selectedUser, conversationId])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  useEffect(() => {
+    // Subscribe to incoming messages (only once on mount)
+    console.log('🎣 Setting up message listener');
+    const unsubscribe = websocketService.onMessage((messageData: MessageData) => {
+      console.log('📨 Received message from WebSocket:', messageData)
+      console.log('   Message ID:', messageData.id)
+      console.log('   Sender ID:', messageData.senderId)
+      console.log('   Receiver ID:', messageData.receiverId)
+      console.log('   Conversation ID:', messageData.conversationId)
+      console.log('   Content:', messageData.content)
+
+      // Add message to state if it's relevant to current user
+      setMessages(prev => {
+        // Check if message already exists to avoid duplicates
+        if (messageData.id && prev.some(m => m.id === messageData.id)) {
+          console.log('⚠️ Message already exists, skipping');
+          return prev;
+        }
+
+        // Add the message
+        console.log('✅ Adding message to state');
+        return [...prev, messageData as MessageDTO];
+      })
+
+      // Update conversationId if we don't have it yet
+      setConversationId(prevId => {
+        if (!prevId && messageData.conversationId) {
+          console.log('📝 Setting conversation ID:', messageData.conversationId);
+          return messageData.conversationId;
+        }
+        return prevId;
+      });
+
+      // Reload conversations to update last message
+      loadConversations();
+    })
+
+    console.log('✅ Message listener set up');
+    return () => {
+      console.log('🧹 Cleaning up message listener');
+      unsubscribe()
+    }
+  }, []) // Empty deps - only run once on mount
+
+  const initializeWebSocket = () => {
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      const user = JSON.parse(userStr)
+      setCurrentUserId(user.id)
+
+      if (!websocketService.isConnected()) {
+        websocketService.connect(user.id)
+      }
+    }
+  }
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const loadFriendsAndConversations = async () => {
+    try {
+      const friendsData = await friendService.getFriends()
+      setFriends(friendsData)
+
+      const userStr = localStorage.getItem('user')
+      if (userStr) {
+        const user = JSON.parse(userStr)
+        await loadConversations()
+      }
+    } catch (error) {
+      console.error('Failed to load friends:', error)
+    }
+  }
+
+  const loadConversations = async () => {
+    const userStr = localStorage.getItem('user')
+    if (!userStr) return
+
+    try {
+      const user = JSON.parse(userStr)
+      const conversationsData = await messageService.getUserConversations(user.id)
+      setConversations(conversationsData)
+    } catch (error) {
+      console.error('Failed to load conversations:', error)
+    }
+  }
+
+  const loadMessages = async () => {
+    if (!conversationId) return
+
+    try {
+      const response = await messageService.getMessages(conversationId, 0, 50)
+      setMessages(response.content)
+    } catch (error) {
+      console.error('Failed to load messages:', error)
+    }
+  }
+
+  const handleSelectUser = async (friend: UserSearchDto) => {
+    setSelectedUser(friend)
+    setMessages([])
+
+    if (!currentUserId) return
+
+    try {
+      // Find conversation
+      const conversation = conversations.find(c =>
+        c.user1.id === friend.id || c.user2.id === friend.id
+      )
+
+      if (conversation) {
+        setConversationId(conversation.id)
+      } else {
+        // No conversation yet
+        setConversationId(null)
+        setMessages([])
+      }
+    } catch (error) {
+      console.error('Failed to load conversation:', error)
+    }
+  }
+
+  const handleSendMessage = () => {
+    console.log('=== handleSendMessage called (Messages Page) ===');
+    console.log('Message content:', message);
+    console.log('Selected user:', selectedUser);
+    console.log('Current user ID:', currentUserId);
+    console.log('WebSocket connected:', websocketService.isConnected());
+
+    if (!message.trim()) {
+      console.log('❌ Message is empty');
+      return;
+    }
+
+    if (!selectedUser) {
+      console.log('❌ No user selected');
+      return;
+    }
+
+    if (!currentUserId) {
+      console.log('❌ No current user ID');
+      return;
+    }
+
+    const messageData: MessageData = {
+      senderId: currentUserId,
+      receiverId: selectedUser.id,
+      content: message.trim(),
+      messageType: 'TEXT'
+    }
+
+    console.log('📤 Preparing to send message:', messageData);
+    websocketService.sendMessage(messageData)
+    console.log('✅ Message sent to WebSocket service');
+    setMessage('')
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
 
   const handleNavClick = (item: string) => {
     if (item === "Home") {
@@ -131,122 +283,186 @@ export default function MessagesPage() {
             <input
               type="text"
               placeholder="Search messages"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground"
             />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {conversations.map((conv) => (
-            <button
-              key={conv.username}
-              onClick={() => setSelectedUser(conv.username)}
-              className={`w-full flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors ${
-                selectedUser === conv.username ? "bg-muted/50" : ""
-              }`}
-            >
-              <Avatar className="w-14 h-14">
-                <AvatarImage src={conv.avatar || "/placeholder.svg"} />
-                <AvatarFallback>{conv.username[0].toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 text-left">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-semibold">{conv.username}</p>
-                  <span className="text-xs text-muted-foreground">{conv.time}</span>
+          {friends.filter(friend =>
+            friend.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            friend.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
+          ).map((friend) => {
+            const conversation = conversations.find(c =>
+              c.user1.id === friend.id || c.user2.id === friend.id
+            )
+
+            return (
+              <button
+                key={friend.id}
+                onClick={() => handleSelectUser(friend)}
+                className={`w-full flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors ${
+                  selectedUser?.id === friend.id ? "bg-muted/50" : ""
+                }`}
+              >
+                <Avatar className="w-14 h-14">
+                  <AvatarImage src={friend.avatarUrl ? `${API_BASE_URL}${friend.avatarUrl}` : "/placeholder.svg"} />
+                  <AvatarFallback>{friend.username[0].toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 text-left">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-semibold">{friend.displayName || friend.username}</p>
+                    {conversation?.lastMessageAt && (
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(conversation.lastMessageAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground truncate">
+                      {conversation ? "Chat with " + friend.username : "Start a conversation"}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <p className={`text-sm ${conv.unread > 0 ? "font-semibold" : "text-muted-foreground"}`}>
-                    {conv.lastMessage}
-                  </p>
-                  {conv.unread > 0 && (
-                    <div className="w-5 h-5 bg-[#0095f6] rounded-full flex items-center justify-center text-xs text-white">
-                      {conv.unread}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            )
+          })}
         </div>
       </div>
 
       <div className="flex-1 flex flex-col">
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Avatar className="w-10 h-10">
-              <AvatarImage src={selectedConversation?.avatar || "/placeholder.svg"} />
-              <AvatarFallback>{selectedUser[0].toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="text-sm font-semibold">{selectedUser}</p>
-              <p className="text-xs text-muted-foreground">Active now</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <button className="hover:opacity-70">
-              <Phone className="w-5 h-5" />
-            </button>
-            <button className="hover:opacity-70">
-              <Video className="w-5 h-5" />
-            </button>
-            <button className="hover:opacity-70">
-              <Info className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 px-6 py-4">
-          <div className="w-full space-y-4 font-normal">
-            {messages.map((msg, index) => (
-              <div key={index} className={`flex gap-2 ${msg.isOwn ? "justify-end" : ""}`}>
-                {!msg.isOwn && (
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src={selectedConversation?.avatar || "/placeholder.svg"} />
-                    <AvatarFallback>{selectedUser[0].toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                )}
-                <div className={`flex flex-col ${msg.isOwn ? "items-end" : ""}`}>
-                  <div
-                    className={`rounded-2xl px-4 py-2 max-w-md ${msg.isOwn ? "bg-[#0095f6] text-white" : "bg-muted text-foreground"}`}
-                  >
-                    <p className="text-sm">{msg.text}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground mt-1">{msg.time}</span>
+        {selectedUser ? (
+          <>
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar className="w-10 h-10">
+                  <AvatarImage src={selectedUser.avatarUrl ? `${API_BASE_URL}${selectedUser.avatarUrl}` : "/placeholder.svg"} />
+                  <AvatarFallback>{selectedUser.username[0].toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-semibold">{selectedUser.displayName || selectedUser.username}</p>
+                  <p className="text-xs text-muted-foreground">@{selectedUser.username}</p>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="p-4 border-t border-border">
-          <div className="w-full flex items-center justify-between gap-3 font-normal">
-            <div className="flex-1 flex items-center gap-2 bg-muted rounded-full px-4 py-3">
-              <button className="text-muted-foreground hover:text-foreground">
-                <Smile className="w-5 h-5" />
-              </button>
-              <input
-                type="text"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Message..."
-                className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground"
-              />
-              <button className="text-muted-foreground hover:text-foreground">
-                <ImageIcon className="w-5 h-5" />
-              </button>
-              <button className="text-muted-foreground hover:text-foreground">
-                <Mic className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-4">
+                <button className="hover:opacity-70">
+                  <Phone className="w-5 h-5" />
+                </button>
+                <button className="hover:opacity-70">
+                  <Video className="w-5 h-5" />
+                </button>
+                <button className="hover:opacity-70">
+                  <Info className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-            {message ? (
-              <button className="text-[#0095f6] hover:opacity-70 font-semibold text-sm">Send</button>
-            ) : (
-              <button className="text-muted-foreground hover:text-foreground">
-                <Heart className="w-6 h-6" />
-              </button>
-            )}
+
+            <div className="flex-1 overflow-y-auto p-6 px-6 py-4">
+              {(() => {
+                // Filter messages for current conversation
+                const conversationMessages = messages.filter(msg => {
+                  if (!selectedUser || !currentUserId) return false;
+
+                  // Message is part of this conversation if:
+                  // - sender is current user and receiver is selected user, OR
+                  // - sender is selected user and receiver is current user
+                  return (
+                    (msg.senderId === currentUserId && msg.receiverId === selectedUser.id) ||
+                    (msg.senderId === selectedUser.id && msg.receiverId === currentUserId)
+                  );
+                });
+
+                if (conversationMessages.length === 0) {
+                  return (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-sm text-muted-foreground">No messages yet. Say hi! 👋</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="w-full space-y-4 font-normal">
+                    {conversationMessages.map((msg, index) => {
+                      const isOwn = msg.senderId === currentUserId
+                      return (
+                        <div key={msg.id || index} className={`flex gap-2 ${isOwn ? "justify-end" : ""}`}>
+                          {!isOwn && (
+                            <Avatar className="w-8 h-8">
+                              <AvatarImage src={selectedUser.avatarUrl ? `${API_BASE_URL}${selectedUser.avatarUrl}` : "/placeholder.svg"} />
+                              <AvatarFallback>{selectedUser.username[0].toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                          )}
+                          <div className={`flex flex-col ${isOwn ? "items-end" : ""}`}>
+                            <div
+                              className={`rounded-2xl px-4 py-2 max-w-md ${isOwn ? "bg-[#0095f6] text-white" : "bg-muted text-foreground"}`}
+                            >
+                              <p className="text-sm break-words">{msg.content}</p>
+                            </div>
+                            {msg.createdAt && (
+                              <span className="text-xs text-muted-foreground mt-1">
+                                {new Date(msg.createdAt).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    <div ref={messagesEndRef} />
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="p-4 border-t border-border">
+              <div className="w-full flex items-center justify-between gap-3 font-normal">
+                <div className="flex-1 flex items-center gap-2 bg-muted rounded-full px-4 py-3">
+                  <button className="text-muted-foreground hover:text-foreground">
+                    <Smile className="w-5 h-5" />
+                  </button>
+                  <input
+                    type="text"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Message..."
+                    className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground"
+                  />
+                  <button className="text-muted-foreground hover:text-foreground">
+                    <ImageIcon className="w-5 h-5" />
+                  </button>
+                </div>
+                {message ? (
+                  <button
+                    onClick={handleSendMessage}
+                    className="text-[#0095f6] hover:opacity-70 font-semibold text-sm"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                ) : (
+                  <button className="text-muted-foreground hover:text-foreground">
+                    <Heart className="w-6 h-6" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <MessageCircle className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-xl font-semibold mb-2">Your Messages</h3>
+              <p className="text-sm text-muted-foreground">Select a conversation to start messaging</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {showCreateModal && (
