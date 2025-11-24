@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { accountSwitcherService } from '@/lib/services/accountSwitcherService';
+import { UserStatus } from '@/lib/types/userStatus';
 
 interface User {
     id: number;
@@ -10,6 +11,10 @@ interface User {
     email: string;
     displayName: string;
     avatarUrl?: string;
+    status?: UserStatus;
+    isOnline?: boolean;
+    lastSeenAt?: string;
+    lastActivityAt?: string;
 }
 
 interface AuthContextType {
@@ -282,7 +287,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         router.push('/');
     };
 
-    const logout = () => {
+    const logout = async () => {
+        // Set user status to OFFLINE before logout
+        if (token && user?.id) {
+            try {
+                await fetch('http://localhost:8080/api/auth/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+            } catch (error) {
+                console.error('[AuthProvider] Failed to set offline status:', error);
+                // Continue with logout even if API call fails
+            }
+        }
+
         setUser(null);
         setToken(null);
 

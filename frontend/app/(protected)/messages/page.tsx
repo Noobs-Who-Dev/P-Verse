@@ -12,10 +12,15 @@ import { friendService, type UserSearchDto } from "@/lib/services/friendService"
 import { websocketService, type MessageData } from "@/lib/services/websocketService"
 import { messageService, type MessageDTO, type ConversationDTO } from "@/lib/services/messageService"
 import { API_BASE_URL } from "@/lib/api/axios"
+import { useUserStatus } from "@/lib/contexts/UserStatusContext"
+import { useI18n } from "@/lib/i18n/I18nContext"
+import { getStatusIndicator, isUserOnline, getShortLastSeenText } from "@/lib/utils/userStatusUtils"
 
 export default function MessagesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { t } = useI18n()
+  const { getUserStatus } = useUserStatus()
   const [selectedUser, setSelectedUser] = useState<UserSearchDto | null>(null)
   const [message, setMessage] = useState("")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
@@ -258,8 +263,6 @@ export default function MessagesPage() {
     setActivePanel(null)
   }
 
-  const selectedConversation = conversations.find((c) => c.username === selectedUser)
-
   return (
     <div className="min-h-screen bg-background text-foreground flex">
       <Sidebar collapsed={sidebarCollapsed} onNavClick={handleNavClick} />
@@ -299,6 +302,12 @@ export default function MessagesPage() {
               c.user1.id === friend.id || c.user2.id === friend.id
             )
 
+            // Get user status
+            const friendStatus = getUserStatus(friend.id)
+            const statusIndicator = getStatusIndicator(friendStatus?.status)
+            const friendOnline = isUserOnline(friendStatus?.status)
+            const shortLastSeen = !friendOnline ? getShortLastSeenText(friendStatus?.lastSeenAt, t) : null
+
             return (
               <button
                 key={friend.id}
@@ -307,10 +316,22 @@ export default function MessagesPage() {
                   selectedUser?.id === friend.id ? "bg-muted/50" : ""
                 }`}
               >
-                <Avatar className="w-14 h-14">
-                  <AvatarImage src={friend.avatarUrl ? `${API_BASE_URL}${friend.avatarUrl}` : "/placeholder.svg"} />
-                  <AvatarFallback>{friend.username[0].toUpperCase()}</AvatarFallback>
-                </Avatar>
+                <div className="relative">
+                  <Avatar className="w-14 h-14">
+                    <AvatarImage src={friend.avatarUrl ? `${API_BASE_URL}${friend.avatarUrl}` : "/placeholder.svg"} />
+                    <AvatarFallback>{friend.username[0].toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  {/* Status indicator - green (ONLINE only) */}
+                  {statusIndicator.show && (
+                    <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 ${statusIndicator.className} border-2 border-background rounded-full z-10`}></span>
+                  )}
+                  {/* Short last seen text at bottom-right corner (compact) */}
+                  {!friendOnline && shortLastSeen && (
+                    <span className="absolute bottom-0 right-0 bg-black/70 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-md rounded-tr-lg">
+                      {shortLastSeen}
+                    </span>
+                  )}
+                </div>
                 <div className="flex-1 text-left">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-sm font-semibold">{friend.displayName || friend.username}</p>
@@ -325,7 +346,7 @@ export default function MessagesPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground truncate">
-                      {conversation ? "Chat with " + friend.username : "Start a conversation"}
+                      {conversation ? `@${friend.username}` : "Start a conversation"}
                     </p>
                   </div>
                 </div>
@@ -340,10 +361,32 @@ export default function MessagesPage() {
           <>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Avatar className="w-10 h-10">
-                  <AvatarImage src={selectedUser.avatarUrl ? `${API_BASE_URL}${selectedUser.avatarUrl}` : "/placeholder.svg"} />
-                  <AvatarFallback>{selectedUser.username[0].toUpperCase()}</AvatarFallback>
-                </Avatar>
+                <div className="relative">
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage src={selectedUser.avatarUrl ? `${API_BASE_URL}${selectedUser.avatarUrl}` : "/placeholder.svg"} />
+                    <AvatarFallback>{selectedUser.username[0].toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  {/* Status indicator for selected user */}
+                  {(() => {
+                    const selectedStatus = getUserStatus(selectedUser.id)
+                    const selectedIndicator = getStatusIndicator(selectedStatus?.status)
+                    const selectedOnline = isUserOnline(selectedStatus?.status)
+                    const selectedShortLastSeen = !selectedOnline ? getShortLastSeenText(selectedStatus?.lastSeenAt, t) : null
+
+                    return (
+                      <>
+                        {selectedIndicator.show && (
+                          <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 ${selectedIndicator.className} border-2 border-background rounded-full z-10`}></span>
+                        )}
+                        {!selectedOnline && selectedShortLastSeen && (
+                          <span className="absolute bottom-0 right-0 bg-black/70 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-bl-md rounded-tr-lg">
+                            {selectedShortLastSeen}
+                          </span>
+                        )}
+                      </>
+                    )
+                  })()}
+                </div>
                 <div>
                   <p className="text-sm font-semibold">{selectedUser.displayName || selectedUser.username}</p>
                   <p className="text-xs text-muted-foreground">@{selectedUser.username}</p>

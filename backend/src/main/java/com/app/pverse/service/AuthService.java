@@ -28,6 +28,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
+    private final UserStatusService userStatusService;
 
     /**
      * Login
@@ -51,9 +52,12 @@ public class AuthService {
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // 5. Update last seen
+        // 5. Update last seen and set status to ONLINE
         user.setLastSeenAt(LocalDateTime.now());
         userRepository.save(user);
+
+        // Set user status to ONLINE
+        userStatusService.setUserOnline(user.getId());
 
         // 6. Return response
         return AuthResponse.builder()

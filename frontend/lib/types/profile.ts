@@ -1,5 +1,7 @@
 // Types for Profile feature
 
+import { UserStatus } from './userStatus';
+
 export interface ProfileStats {
   userId: number;
   postsCount: number;
@@ -17,7 +19,9 @@ export interface UserProfile {
     avatarUrl?: string;
     bio?: string;
     isOnline: boolean;
+    status: UserStatus;
     lastSeenAt?: string;
+    lastActivityAt?: string;
     createdAt: string;
   };
   stats: ProfileStats;

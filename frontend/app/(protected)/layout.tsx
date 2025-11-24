@@ -5,6 +5,6 @@ export default function ProtectedLayout({
 }: {
     children: React.ReactNode;
 }) {
-    // Đơn giản render children, không force authentication
+    // UserStatusProvider is already in root layout
     return <>{children}</>;
 }

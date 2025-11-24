@@ -237,7 +237,9 @@ public class UserService {
                 .avatarUrl(user.getAvatarUrl())
                 .phoneNumber(user.getPhoneNumber())
                 .isOnline(user.getIsOnline())
+                .status(user.getStatus())
                 .lastSeenAt(user.getLastSeenAt())
+                .lastActivityAt(user.getLastActivityAt())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

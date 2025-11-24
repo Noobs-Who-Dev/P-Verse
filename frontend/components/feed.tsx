@@ -78,7 +78,7 @@ export function Feed({ selectedFilter }: FeedProps) {
 
       // Client-side filter for specific friend
       if (specificUserId) {
-        filteredMoments = filteredMoments.filter(m => m.user.id === specificUserId)
+        filteredMoments = filteredMoments.filter((m: MomentResponseDTO) => m.user.id === specificUserId)
       }
 
       setMoments(filteredMoments)
@@ -107,6 +107,29 @@ export function Feed({ selectedFilter }: FeedProps) {
     if (avatarUrl.startsWith('http')) return avatarUrl
     const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
     return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/${cleanPath}`
+  }
+
+  const getTimeAgo = (createdAt: string): string => {
+    const now = new Date()
+    const created = new Date(createdAt)
+    const diffMs = now.getTime() - created.getTime()
+    const diffMinutes = Math.floor(diffMs / 60000)
+
+    if (diffMinutes < 1) return 'Just now'
+    if (diffMinutes < 60) return `${diffMinutes}m ago`
+
+    const diffHours = Math.floor(diffMinutes / 60)
+    if (diffHours < 24) return `${diffHours}h ago`
+
+    const diffDays = Math.floor(diffHours / 24)
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return `${diffDays}d ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+
+    const diffMonths = Math.floor(diffDays / 30)
+    if (diffMonths < 12) return `${diffMonths}mo ago`
+
+    return `${Math.floor(diffMonths / 12)}y ago`
   }
 
   // Loading state
@@ -155,6 +178,7 @@ export function Feed({ selectedFilter }: FeedProps) {
             <Post
               key={moment.id}
               id={moment.id.toString()}
+              userId={moment.user.id}
               username={moment.user.username}
               displayName={moment.user.displayName}
               userAvatar={getAvatarUrl(moment.user.avatarUrl)}
@@ -164,7 +188,7 @@ export function Feed({ selectedFilter }: FeedProps) {
               likes={moment.reactionCount || 0}
               caption={moment.caption || ""}
               comments={[]}
-              timeAgo={moment.timeAgo || ""}
+              timeAgo={getTimeAgo(moment.createdAt)}
               // NEW PROPS
               isOwner={isOwner}
               allowJoinIn={false} // TODO: Get from backend when available
