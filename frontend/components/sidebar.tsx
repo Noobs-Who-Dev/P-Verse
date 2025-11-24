@@ -12,6 +12,7 @@ import {
   BarChart3,
   Bookmark,
   Moon,
+  Sun,
   AlertCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -19,14 +20,22 @@ import { useState } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth/authContext"
+import { useI18n } from "@/lib/i18n/I18nContext"
+import { getAvatarUrl } from "@/lib/utils/avatar"
+import { useTheme } from "next-themes"
+import { ActivityModal } from "@/components/activity-modal"
+import { ReportProblemModal } from "@/components/report-problem-modal"
+import { YourActivityModal } from "@/components/your-activity-modal"
+import { settingsService } from "@/app/(protected)/services/settingsService"
+import { useToast } from "@/hooks/use-toast"
 
 const navItems = [
-  { icon: Home, label: "Home" },
-  { icon: Search, label: "Search" },
-  { icon: MessageCircle, label: "Messages" },
-  { icon: Heart, label: "Notifications" },
-  { icon: PlusSquare, label: "Create" },
-  { icon: User, label: "Profile" },
+  { icon: Home, label: "Home", key: "home" as const },
+  { icon: Search, label: "Search", key: "search" as const },
+  { icon: MessageCircle, label: "Messages", key: "messages" as const },
+  { icon: Heart, label: "Notifications", key: "notifications" as const },
+  { icon: PlusSquare, label: "Create", key: "createPost" as const },
+  { icon: User, label: "Profile", key: "profile" as const },
 ]
 
 interface SidebarProps {
@@ -36,9 +45,15 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
   const router = useRouter()
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
+  const { t, language } = useI18n()
+  const { theme, setTheme } = useTheme()
+  const { toast } = useToast()
   const [activeItem, setActiveItem] = useState("Home")
   const [showMoreDropdown, setShowMoreDropdown] = useState(false)
+  const [showActivityModal, setShowActivityModal] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [showYourActivityModal, setShowYourActivityModal] = useState(false)
 
   const handleClick = (label: string) => {
     setActiveItem(label)
@@ -48,16 +63,59 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
     onNavClick(label)
   }
 
+  const handleThemeToggle = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated. Please login again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      // Toggle theme
+      const newTheme = theme === "dark" ? "light" : "dark"
+      setTheme(newTheme)
+
+      // Save to database
+      await settingsService.updateTheme(user.id, newTheme.toUpperCase())
+
+      toast({
+        title: "Success",
+        description: `Theme changed to ${newTheme} mode`,
+      })
+    } catch (error) {
+      console.error("Failed to update theme:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update theme. Please try again.",
+        variant: "destructive",
+      })
+      // Revert theme on error
+      setTheme(theme === "dark" ? "light" : "dark")
+    }
+  }
+
   const handleMoreItemClick = (action: string) => {
     setShowMoreDropdown(false)
+
     if (action === "Settings") {
       router.push("/settings")
     } else if (action === "Saved") {
       router.push("/profile") // Navigate to profile with saved tab
+    } else if (action === "Switch appearance") {
+      // Toggle theme and save to database
+      handleThemeToggle()
+    } else if (action === "Your activity") {
+      // Open your activity modal
+      setShowYourActivityModal(true)
+    } else if (action === "Report a problem") {
+      // Open report problem modal
+      setShowReportModal(true)
     } else if (action === "Log out") {
       logout()
     }
-    // Add other actions as needed
   }
 
   return (
@@ -87,17 +145,17 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
                 "flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-secondary transition-colors",
                 activeItem === item.label && "font-bold",
               )}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? t(item.key) : undefined}
             >
               {item.label === "Profile" ? (
                 <Avatar className="w-6 h-6">
-                  <AvatarImage src="/placeholder.svg?height=24&width=24" />
-                  <AvatarFallback>U</AvatarFallback>
+                  <AvatarImage src={getAvatarUrl(user?.avatarUrl)} />
+                  <AvatarFallback>{user?.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
                 </Avatar>
               ) : (
                 <item.icon className="w-6 h-6" strokeWidth={activeItem === item.label ? 2.5 : 2} />
               )}
-              {!collapsed && <span className="text-base">{item.label}</span>}
+              {!collapsed && <span className="text-base">{t(item.key)}</span>}
             </button>
           ))}
         </div>
@@ -110,49 +168,46 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
                 <Settings className="w-5 h-5" />
-                <span>Settings</span>
+                <span>{t('settings')}</span>
               </button>
               <button
                 onClick={() => handleMoreItemClick("Your activity")}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
                 <BarChart3 className="w-5 h-5" />
-                <span>Your activity</span>
+                <span>{t('yourActivity')}</span>
               </button>
               <button
                 onClick={() => handleMoreItemClick("Saved")}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
                 <Bookmark className="w-5 h-5" />
-                <span>Saved</span>
+                <span>{t('saved')}</span>
               </button>
               <button
                 onClick={() => handleMoreItemClick("Switch appearance")}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
-                <Moon className="w-5 h-5" />
-                <span>Switch appearance</span>
+                {theme === "dark" ? (
+                  <Sun className="w-5 h-5" />
+                ) : (
+                  <Moon className="w-5 h-5" />
+                )}
+                <span>{t('switchAppearance')}</span>
               </button>
               <button
                 onClick={() => handleMoreItemClick("Report a problem")}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
                 <AlertCircle className="w-5 h-5" />
-                <span>Report a problem</span>
-              </button>
-              <div className="border-t border-border my-1" />
-              <button
-                onClick={() => handleMoreItemClick("Switch accounts")}
-                className="px-4 py-3 hover:bg-accent transition-colors w-full text-left"
-              >
-                <span>Switch accounts</span>
+                <span>{t('reportProblem')}</span>
               </button>
               <div className="border-t border-border" />
               <button
                 onClick={() => handleMoreItemClick("Log out")}
                 className="px-4 py-3 hover:bg-accent transition-colors w-full text-left"
               >
-                <span>Log out</span>
+                <span>{t('logout')}</span>
               </button>
             </div>
           )}
@@ -160,13 +215,32 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
           <button
             onClick={() => setShowMoreDropdown(!showMoreDropdown)}
             className="flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-secondary transition-colors w-full"
-            title={collapsed ? "More" : undefined}
+            title={collapsed ? (language === 'vi' ? 'Thêm' : 'More') : undefined}
           >
             <Menu className="w-6 h-6" />
-            {!collapsed && <span className="text-base">More</span>}
+            {!collapsed && <span className="text-base">{language === 'vi' ? 'Thêm' : 'More'}</span>}
           </button>
         </div>
       </nav>
+
+      {/* Activity Modal */}
+      <ActivityModal
+        isOpen={showActivityModal}
+        onClose={() => setShowActivityModal(false)}
+        username={user?.username || ""}
+      />
+
+      {/* Report Problem Modal */}
+      <ReportProblemModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+      />
+
+      {/* Your Activity Modal */}
+      <YourActivityModal
+        isOpen={showYourActivityModal}
+        onClose={() => setShowYourActivityModal(false)}
+      />
     </aside>
   )
 }

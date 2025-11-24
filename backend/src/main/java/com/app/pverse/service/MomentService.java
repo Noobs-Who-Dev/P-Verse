@@ -859,4 +859,52 @@ public class MomentService {
     public boolean isMomentSavedByUser(Long momentId, Long userId) {
         return savedMomentRepository.existsByUserIdAndMomentId(userId, momentId);
     }
+
+    // ==================== USER ACTIVITY METHODS ====================
+
+    /**
+     * Get moments created by a specific user
+     */
+    @Transactional(readOnly = true)
+    public Slice<MomentResponseDTO> getUserMoments(Long userId, Pageable pageable) {
+        log.info("📋 getUserMoments: userId={}, page={}, size={}", userId, pageable.getPageNumber(), pageable.getPageSize());
+
+        // Get moments by user, ordered by createdAt desc
+        var momentsSlice = momentRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+
+        // Convert to DTOs
+        var content = momentsSlice.getContent().stream()
+                .map(moment -> toResponseDTO(moment, userId))
+                .collect(Collectors.toList());
+
+        return new org.springframework.data.domain.SliceImpl<>(content, pageable, momentsSlice.hasNext());
+    }
+
+    /**
+     * Get reactions made by a specific user
+     */
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<Map<String, Object>> getUserReactions(Long userId, Pageable pageable) {
+        log.info("📋 getUserReactions: userId={}, page={}, size={}", userId, pageable.getPageNumber(), pageable.getPageSize());
+
+        // Get reactions by user, ordered by createdAt desc
+        var reactionsList = momentReactionRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+
+        // Convert to response format
+        var content = reactionsList.stream()
+                .map(reaction -> {
+                    Map<String, Object> reactionData = new HashMap<>();
+                    reactionData.put("id", reaction.getId());
+                    reactionData.put("momentId", reaction.getMoment().getId());
+                    reactionData.put("momentCaption", reaction.getMoment().getCaption() != null ? reaction.getMoment().getCaption() : "No caption");
+                    reactionData.put("momentImagePath", reaction.getMoment().getImagePath());
+                    reactionData.put("reactionType", reaction.getReactionType().name());
+                    reactionData.put("emoji", getReactionEmoji(reaction.getReactionType()));
+                    reactionData.put("reactedAt", reaction.getCreatedAt());
+                    return reactionData;
+                })
+                .collect(Collectors.toList());
+
+        return new org.springframework.data.domain.PageImpl<>(content, pageable, content.size());
+    }
 }

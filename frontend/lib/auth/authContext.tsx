@@ -19,6 +19,7 @@ interface AuthContextType {
     register: (username: string, email: string, password: string, displayName?: string) => Promise<void>;
     logout: () => void;
     switchAccount: (account: { id: number; username: string; displayName: string; email: string; avatarUrl?: string; token: string }) => Promise<void>;
+    refreshUser: () => Promise<void>;
     isAuthenticated: boolean;
     isLoading: boolean;
 }
@@ -192,6 +193,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         console.log('[AuthProvider] Login successful at:', new Date(loginTime).toISOString());
 
+        // Sync theme preference from login page to database
+        try {
+            const preferredTheme = localStorage.getItem('preferredTheme');
+            if (preferredTheme) {
+                console.log('[AuthProvider] Syncing theme preference to database:', preferredTheme);
+                // Import settingsService dynamically to avoid circular dependency
+                const { settingsService } = await import('@/app/(protected)/services/settingsService');
+                await settingsService.updateTheme(userId, preferredTheme.toUpperCase());
+                console.log('[AuthProvider] Theme synced successfully');
+                // Clean up the preference flag
+                localStorage.removeItem('preferredTheme');
+            }
+        } catch (error) {
+            console.error('[AuthProvider] Failed to sync theme preference:', error);
+            // Don't block login if theme sync fails
+        }
+
         // Redirect
         router.push('/');
     };
@@ -244,6 +262,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         console.log('[AuthProvider] Registration successful at:', new Date(loginTime).toISOString());
 
+        // Sync theme preference from register page to database
+        try {
+            const preferredTheme = localStorage.getItem('preferredTheme');
+            if (preferredTheme) {
+                console.log('[AuthProvider] Syncing theme preference to database:', preferredTheme);
+                // Import settingsService dynamically to avoid circular dependency
+                const { settingsService } = await import('@/app/(protected)/services/settingsService');
+                await settingsService.updateTheme(userId, preferredTheme.toUpperCase());
+                console.log('[AuthProvider] Theme synced successfully');
+                // Clean up the preference flag
+                localStorage.removeItem('preferredTheme');
+            }
+        } catch (error) {
+            console.error('[AuthProvider] Failed to sync theme preference:', error);
+            // Don't block registration if theme sync fails
+        }
+
         router.push('/');
     };
 
@@ -267,6 +302,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         console.log('[AuthProvider] Logout, redirecting to /login');
         router.push('/login');
+    };
+
+    const refreshUser = async () => {
+        console.log('[AuthProvider] Refreshing user data...');
+
+        if (!token || !user?.id) {
+            console.warn('[AuthProvider] No token or user ID, cannot refresh');
+            return;
+        }
+
+        try {
+            // Fetch latest user data from server
+            const response = await fetch('http://localhost:8080/api/users/me', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                console.error('[AuthProvider] Failed to refresh user data');
+                return;
+            }
+
+            const result = await response.json();
+            const updatedUserData = result.data;
+
+            // Update user object with fresh data
+            const freshUser = {
+                id: updatedUserData.id,
+                username: updatedUserData.username,
+                email: updatedUserData.email,
+                displayName: updatedUserData.displayName,
+                avatarUrl: updatedUserData.avatarUrl,
+            };
+
+            const userDataString = JSON.stringify(freshUser);
+
+            // Update all storage locations
+            localStorage.setItem('user', userDataString);
+            sessionStorage.setItem('user', userDataString);
+
+            // Update state - this will trigger re-render of all components using useAuth
+            setUser(freshUser);
+
+            console.log('[AuthProvider] User data refreshed successfully', freshUser);
+        } catch (error) {
+            console.error('[AuthProvider] Error refreshing user data:', error);
+        }
     };
 
     const switchAccount = async (account: { id: number; username: string; displayName: string; email: string; avatarUrl?: string; token: string }) => {
@@ -311,6 +395,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 register,
                 logout,
                 switchAccount,
+                refreshUser,
                 isAuthenticated: !!token,
                 isLoading,
             }}

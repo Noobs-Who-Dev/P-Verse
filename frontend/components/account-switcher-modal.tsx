@@ -14,7 +14,7 @@ interface AccountSwitcherModalProps {
 }
 
 export function AccountSwitcherModal({ isOpen, onClose }: AccountSwitcherModalProps) {
-  const { switchAccount } = useAuth()
+  const { switchAccount, logout } = useAuth()
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([])
   const [currentAccountId, setCurrentAccountId] = useState<number | null>(null)
 
@@ -81,16 +81,15 @@ export function AccountSwitcherModal({ isOpen, onClose }: AccountSwitcherModalPr
 
   const handleAddAccount = () => {
     onClose()
-    // Will logout and go to login page
-    if (confirm('Bạn sẽ được đăng xuất để thêm tài khoản mới. Tiếp tục?')) {
-      window.location.href = '/login'
-    }
+    // Logout and redirect to login page to add new account
+    logout()
   }
 
   const getAvatarUrl = (avatarUrl?: string) => {
     if (!avatarUrl) return "/placeholder-user.jpg"
     if (avatarUrl.startsWith('http')) return avatarUrl
-    return `${API_BASE_URL}/${avatarUrl}`
+    const cleanPath = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+    return `${API_BASE_URL}/${cleanPath}`
   }
 
   const formatExpiry = (expiryTime: number) => {

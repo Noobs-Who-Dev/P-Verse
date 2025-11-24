@@ -175,14 +175,6 @@
             </PendingDiffInfo>
           </value>
         </entry>
-        <entry key="$PROJECT_DIR$/backend/check-messages.sql">
-          <value>
-            <PendingDiffInfo>
-              <option name="filePath" value="$PROJECT_DIR$/backend/check-messages.sql" />
-              <option name="updatedContent" value="-- Query to check messages in database&#10;SELECT &#10;    m.id,&#10;    m.conversation_id,&#10;    m.sender_id,&#10;    m.content,&#10;    m.message_type,&#10;    m.is_read,&#10;    m.created_at,&#10;    s.username as sender_username,&#10;    c.user1_id,&#10;    c.user2_id&#10;FROM messages m&#10;JOIN users s ON m.sender_id = s.id&#10;JOIN conversations c ON m.conversation_id = c.id&#10;ORDER BY m.created_at DESC&#10;LIMIT 20;&#10;&#10;-- Check conversations&#10;SELECT &#10;    c.id,&#10;    c.user1_id,&#10;    c.user2_id,&#10;    c.created_at,&#10;    c.last_message_at,&#10;    u1.username as user1_username,&#10;    u2.username as user2_username&#10;FROM conversations c&#10;JOIN users u1 ON c.user1_id = u1.id&#10;JOIN users u2 ON c.user2_id = u2.id&#10;ORDER BY c.last_message_at DESC;&#10;&#10;-- Check if users are friends&#10;SELECT &#10;    f.id,&#10;    f.user_id,&#10;    f.friend_id,&#10;    f.status,&#10;    u1.username as user_username,&#10;    u2.username as friend_username&#10;FROM friendships f&#10;JOIN users u1 ON f.user_id = u1.id&#10;JOIN users u2 ON f.friend_id = u2.id&#10;WHERE f.status = 'accepted'&#10;ORDER BY f.id;&#10;" />
-            </PendingDiffInfo>
-          </value>
-        </entry>
         <entry key="$PROJECT_DIR$/backend/src/main/java/com/app/pverse/dto/response/UserSettingsDto.java">
           <value>
             <PendingDiffInfo>

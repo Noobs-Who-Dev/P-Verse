@@ -22,7 +22,7 @@ public class MomentContext {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(cascade = CascadeType.REMOVE)
+    @OneToOne
     @JoinColumn(name = "moment_id", nullable = false, unique = true)
     private Moment moment;
 
