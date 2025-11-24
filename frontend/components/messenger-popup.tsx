@@ -149,6 +149,12 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
   }
 
   const handleChatClick = async (friend: UserSearchDto) => {
+    // Prevent clicking on the same chat that is already selected
+    if (selectedChat && selectedChat.id === friend.id) {
+      console.log('⚠️ Already chatting with', friend.username);
+      return;
+    }
+
     console.log('💬 Chat clicked:', friend.username);
     setSelectedChat(friend)
     setMessages([])
@@ -171,7 +177,16 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
       if (conversation) {
         console.log('✅ Found existing conversation:', conversation.id);
         setConversationId(conversation.id)
-        // Load messages will be called by useEffect when conversationId changes
+
+        // Load messages immediately
+        console.log('📥 Loading messages from database...');
+        try {
+          const response = await messageService.getMessages(conversation.id, 0, 50)
+          console.log('✅ Messages loaded:', response.content.length, 'messages');
+          setMessages(response.content)
+        } catch (error) {
+          console.error('❌ Failed to load messages:', error)
+        }
       } else {
         console.log('⚠️ No conversation found - will be created on first message');
         // No conversation yet
@@ -382,7 +397,12 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
             <button
               key={chat.id}
               onClick={() => handleChatClick(chat)}
-              className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors"
+              disabled={selectedChat?.id === chat.id}
+              className={`w-full flex items-center gap-3 p-3 transition-colors ${
+                selectedChat?.id === chat.id
+                  ? 'bg-muted cursor-not-allowed opacity-75'
+                  : 'hover:bg-muted/50 cursor-pointer'
+              }`}
             >
               <Avatar className="w-14 h-14">
                 <AvatarImage src={getAvatarUrl(chat.avatarUrl)} />

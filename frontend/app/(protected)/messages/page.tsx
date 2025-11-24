@@ -154,6 +154,12 @@ export default function MessagesPage() {
   }
 
   const handleSelectUser = async (friend: UserSearchDto) => {
+    // Prevent clicking on the same user that is already selected
+    if (selectedUser && selectedUser.id === friend.id) {
+      console.log('⚠️ Already chatting with', friend.username);
+      return;
+    }
+
     setSelectedUser(friend)
     setMessages([])
 
@@ -167,6 +173,16 @@ export default function MessagesPage() {
 
       if (conversation) {
         setConversationId(conversation.id)
+
+        // Load messages immediately here
+        console.log('📥 Loading messages for conversation:', conversation.id);
+        try {
+          const response = await messageService.getMessages(conversation.id, 0, 50)
+          console.log('✅ Messages loaded:', response.content.length, 'messages');
+          setMessages(response.content)
+        } catch (error) {
+          console.error('❌ Failed to load messages:', error)
+        }
       } else {
         // No conversation yet
         setConversationId(null)
@@ -303,8 +319,11 @@ export default function MessagesPage() {
               <button
                 key={friend.id}
                 onClick={() => handleSelectUser(friend)}
-                className={`w-full flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors ${
-                  selectedUser?.id === friend.id ? "bg-muted/50" : ""
+                disabled={selectedUser?.id === friend.id}
+                className={`w-full flex items-center gap-3 p-4 transition-colors ${
+                  selectedUser?.id === friend.id
+                    ? "bg-muted cursor-not-allowed"
+                    : "hover:bg-muted/50 cursor-pointer"
                 }`}
               >
                 <Avatar className="w-14 h-14">
