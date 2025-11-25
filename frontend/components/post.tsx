@@ -13,6 +13,7 @@ import { useUserStatus } from "@/lib/contexts/UserStatusContext"
 import { UserStatus } from "@/lib/types/userStatus"
 import { useI18n } from "@/lib/i18n/I18nContext"
 import { getStatusIndicator, isUserOnline, getShortLastSeenText } from "@/lib/utils/userStatusUtils"
+import SimplifiedPostModal from "@/components/ui/SimplifiedPostModal"
 
 interface PostProps {
   id?: string
@@ -71,6 +72,7 @@ export function Post({
   const [isJoinedIn, setIsJoinedIn] = useState(false)
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const [isActivityOpen, setIsActivityOpen] = useState(false)
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false)
   const [messageInput, setMessageInput] = useState("")
   const [isSavedState, setIsSaved] = useState(isSaved)
   const [reactionCount, setReactionCount] = useState(likes || 0)
@@ -341,7 +343,8 @@ export function Post({
           <img
             src={image || "/placeholder.jpg"}
             alt={`Post by ${username}`}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover cursor-pointer"
+            onClick={() => setIsPostModalOpen(true)}
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               target.src = '/placeholder.jpg';
@@ -563,6 +566,14 @@ export function Post({
         username={username}
         momentId={id ? Number(id) : undefined}
       />
+
+      {/* Post Modal */}
+      {isPostModalOpen && id && (
+        <SimplifiedPostModal
+          id={Number(id)}
+          onClose={() => setIsPostModalOpen(false)}
+        />
+      )}
     </>
   )
 }
