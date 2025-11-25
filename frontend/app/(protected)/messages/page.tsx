@@ -277,14 +277,14 @@ export default function MessagesPage() {
   const selectedConversation = conversations.find((c) => c.username === selectedUser)
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
+    <div className="h-screen bg-background text-foreground flex overflow-hidden">
       <Sidebar collapsed={sidebarCollapsed} onNavClick={handleNavClick} />
 
       {activePanel === "search" && <SearchPanel onClose={handleClosePanel} />}
       {activePanel === "notifications" && <NotificationsPanel onClose={handleClosePanel} />}
 
 
-      <div className="w-[400px] border-r border-border flex flex-col ml-[73px]">
+      <div className="w-[400px] border-r border-border flex flex-col ml-[73px] h-full">
         <div className="p-4 border-b border-border flex items-center justify-between">
           <button onClick={() => router.push("/")} className="hover:opacity-70">
             <ArrowLeft className="w-6 h-6" />
@@ -354,7 +354,7 @@ export default function MessagesPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
         {selectedUser ? (
           <>
             <div className="p-4 border-b border-border flex items-center justify-between">
