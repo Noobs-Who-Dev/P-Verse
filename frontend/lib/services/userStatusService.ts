@@ -3,7 +3,7 @@ import { UserStatus, UserStatusDto } from '../types/userStatus';
 
 /**
  * User Status Service
- * Quản lý status của user (ONLINE, AWAY, OFFLINE)
+ * Quản lý status của user (ONLINE, OFFLINE)
  */
 export const userStatusService = {
   /**
@@ -39,7 +39,7 @@ export const userStatusService = {
   },
 
   /**
-   * Ghi nhận hoạt động của user (reset AWAY timer)
+   * Ghi nhận hoạt động của user (reset OFFLINE timer)
    */
   recordActivity: async (): Promise<void> => {
     try {
@@ -56,12 +56,6 @@ export const userStatusService = {
     await axiosInstance.post('/user-status/online');
   },
 
-  /**
-   * Set user AWAY
-   */
-  setAway: async (): Promise<void> => {
-    await axiosInstance.post('/user-status/away');
-  },
 
   /**
    * Set user OFFLINE

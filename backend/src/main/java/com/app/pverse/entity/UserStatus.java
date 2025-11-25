@@ -6,7 +6,6 @@ package com.app.pverse.entity;
  */
 public enum UserStatus {
     ONLINE,     // Đang hoạt động
-    AWAY,       // Vắng mặt (không tương tác > 5 phút)
     OFFLINE     // Không trực tuyến
 }
 

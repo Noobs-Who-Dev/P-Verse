@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 
 /**
  * Service quản lý User Status
- * Xử lý logic cho ONLINE, AWAY, OFFLINE status
+ * Xử lý logic cho ONLINE, OFFLINE status
  */
 @Service
 @RequiredArgsConstructor
@@ -25,8 +25,8 @@ public class UserStatusService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
-    // Thời gian để chuyển từ ONLINE sang AWAY (5 phút)
-    private static final long AWAY_THRESHOLD_MINUTES = 5;
+    // Thời gian để chuyển từ ONLINE sang OFFLINE (5 phút)
+    private static final long OFFLINE_THRESHOLD_MINUTES = 5;
 
     /**
      * Cập nhật status của user
@@ -41,7 +41,7 @@ public class UserStatusService {
         user.setLastActivityAt(LocalDateTime.now());
 
         // Cập nhật isOnline và lastSeenAt
-        if (newStatus == UserStatus.ONLINE || newStatus == UserStatus.AWAY) {
+        if (newStatus == UserStatus.ONLINE) {
             user.setIsOnline(true);
         } else {
             user.setIsOnline(false);
@@ -58,7 +58,7 @@ public class UserStatusService {
 
     /**
      * Cập nhật hoạt động gần nhất của user
-     * Dùng để reset timer AWAY
+     * Dùng để reset timer OFFLINE
      */
     @Transactional
     public void updateUserActivity(Long userId) {
@@ -67,8 +67,8 @@ public class UserStatusService {
 
         user.setLastActivityAt(LocalDateTime.now());
 
-        // Nếu user đang AWAY, chuyển về ONLINE
-        if (user.getStatus() == UserStatus.AWAY) {
+        // Nếu user đang OFFLINE, chuyển về ONLINE
+        if (user.getStatus() == UserStatus.OFFLINE) {
             user.setStatus(UserStatus.ONLINE);
             userRepository.save(user);
             broadcastStatusChange(user);
@@ -93,13 +93,6 @@ public class UserStatusService {
         updateUserStatus(userId, UserStatus.OFFLINE);
     }
 
-    /**
-     * Đánh dấu user là AWAY
-     */
-    @Transactional
-    public void setUserAway(Long userId) {
-        updateUserStatus(userId, UserStatus.AWAY);
-    }
 
     /**
      * Lấy status của user
@@ -123,18 +116,19 @@ public class UserStatusService {
     }
 
     /**
-     * Tự động chuyển ONLINE sang AWAY nếu không có hoạt động
+     * Tự động chuyển ONLINE sang OFFLINE nếu không có hoạt động
      * Được gọi định kỳ bởi scheduled task
      */
     @Transactional
-    public void checkAndUpdateAwayStatus() {
-        LocalDateTime awayThreshold = LocalDateTime.now().minus(AWAY_THRESHOLD_MINUTES, ChronoUnit.MINUTES);
+    public void checkAndUpdateOfflineStatus() {
+        LocalDateTime offlineThreshold = LocalDateTime.now().minusMinutes(OFFLINE_THRESHOLD_MINUTES);
 
         List<User> onlineUsers = userRepository.findByStatus(UserStatus.ONLINE);
 
         for (User user : onlineUsers) {
-            if (user.getLastActivityAt() != null && user.getLastActivityAt().isBefore(awayThreshold)) {
-                user.setStatus(UserStatus.AWAY);
+            if (user.getLastActivityAt() != null && user.getLastActivityAt().isBefore(offlineThreshold)) {
+                user.setStatus(UserStatus.OFFLINE);
+                user.setLastSeenAt(LocalDateTime.now());
                 userRepository.save(user);
                 broadcastStatusChange(user);
             }

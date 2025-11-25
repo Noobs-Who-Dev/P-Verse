@@ -28,11 +28,6 @@ export function UserStatusIndicator({
       label: 'Đang hoạt động',
       ring: 'ring-green-500/20'
     },
-    [UserStatus.AWAY]: {
-      color: 'bg-yellow-500',
-      label: 'Vắng mặt',
-      ring: 'ring-yellow-500/20'
-    },
     [UserStatus.OFFLINE]: {
       color: 'bg-gray-400',
       label: 'Không hoạt động',

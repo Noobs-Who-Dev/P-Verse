@@ -14,14 +14,14 @@ public class UserStatusScheduler {
     private final UserStatusService userStatusService;
 
     /**
-     * Chạy mỗi 1 phút để kiểm tra và cập nhật AWAY status
+     * Chạy mỗi 1 phút để kiểm tra và cập nhật OFFLINE status
      */
     @Scheduled(fixedRate = 60000) // 60 seconds
-    public void checkAwayStatus() {
+    public void checkOfflineStatus() {
         try {
-            userStatusService.checkAndUpdateAwayStatus();
+            userStatusService.checkAndUpdateOfflineStatus();
         } catch (Exception e) {
-            System.err.println("Error checking away status: " + e.getMessage());
+            System.err.println("Error checking offline status: " + e.getMessage());
         }
     }
 }

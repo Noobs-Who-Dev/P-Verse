@@ -68,7 +68,7 @@ public class UserStatusController {
     }
 
     /**
-     * Đánh dấu user đang hoạt động (reset AWAY timer)
+     * Đánh dấu user đang hoạt động (reset OFFLINE timer)
      */
     @PostMapping("/activity")
     public ResponseEntity<ApiResponse<Void>> recordActivity(@AuthenticationPrincipal User user) {
@@ -85,14 +85,6 @@ public class UserStatusController {
         return ResponseEntity.ok(ApiResponse.success("Đã chuyển sang ONLINE", null));
     }
 
-    /**
-     * Set user AWAY
-     */
-    @PostMapping("/away")
-    public ResponseEntity<ApiResponse<Void>> setAway(@AuthenticationPrincipal User user) {
-        userStatusService.setUserAway(user.getId());
-        return ResponseEntity.ok(ApiResponse.success("Đã chuyển sang AWAY", null));
-    }
 
     /**
      * Set user OFFLINE

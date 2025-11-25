@@ -74,7 +74,6 @@ export function getStatusIndicator(status: UserStatus | null | undefined): {
         className: 'bg-green-500'
       };
     case UserStatus.OFFLINE:
-    case UserStatus.AWAY:  // Treat AWAY as OFFLINE
     default:
       return {
         show: false,
@@ -97,7 +96,7 @@ export function isUserOnline(status: UserStatus | null | undefined): boolean {
  * Get short time text for avatar overlay (Facebook style)
  * @param lastSeenAt - ISO timestamp of last activity
  * @param t - Translation function from I18nContext
- * @returns Short time text like "5m", "2h", "3d" (EN) or "5 phút", "2 giờ" (VI)
+ * @returns Short time text like "5m", "2h", "3d" (EN) or "5p", "2g", "3n" (VI)
  */
 export function getShortLastSeenText(
   lastSeenAt: string | undefined,
@@ -117,21 +116,21 @@ export function getShortLastSeenText(
   }
 
   if (diffMinutes < 60) {
-    // EN: "5m", VI: "5 phút"
+    // EN: "5m", VI: "5p" (phút)
     const template = t('shortMinutesAgo');
     return template.replace('{minutes}', diffMinutes.toString());
   }
 
   const diffHours = Math.floor(diffMinutes / 60);
   if (diffHours < 24) {
-    // EN: "2h", VI: "2 giờ"
+    // EN: "2h", VI: "2g" (giờ)
     const template = t('shortHoursAgo');
     return template.replace('{hours}', diffHours.toString());
   }
 
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) {
-    // EN: "3d", VI: "3 ngày"
+    // EN: "3d", VI: "3n" (ngày)
     const template = t('shortDaysAgo');
     return template.replace('{days}', diffDays.toString());
   }

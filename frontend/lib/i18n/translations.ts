@@ -261,11 +261,10 @@ export const translations = {
     activeLongAgo: "Hoạt động lâu rồi",
     online: "Trực tuyến",
     offline: "Ngoại tuyến",
-    away: "Vắng mặt",
     // Short format for avatar overlay (Facebook style)
-    shortMinutesAgo: "{minutes} phút",
-    shortHoursAgo: "{hours} giờ",
-    shortDaysAgo: "{days} ngày",
+    shortMinutesAgo: "{minutes}p",
+    shortHoursAgo: "{hours}g",
+    shortDaysAgo: "{days}n",
 
     // Notification Settings Details
     notificationDetails: "Chi tiết thông báo",
@@ -546,7 +545,6 @@ export const translations = {
     activeLongAgo: "Active long ago",
     online: "Online",
     offline: "Offline",
-    away: "Away",
     // Short format for avatar overlay (Facebook style)
     shortMinutesAgo: "{minutes}m",
     shortHoursAgo: "{hours}h",
