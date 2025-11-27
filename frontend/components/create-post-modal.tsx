@@ -6,7 +6,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ChevronDown } from "lucide-react"
-import { createMoment, updateMoment, getFriends, UserSearchDto, MomentVisibility } from "@/lib/api"
+import { createMoment, updateMoment, getFriends, UserSearchDto, MomentVisibility, MomentResponseDTO, UpdateMomentRequest } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 import Image from "next/image"
 
@@ -166,7 +166,7 @@ export function CreatePostModal({ onClose, editPost, onUpdate, getImageUrl }: Cr
 
       if (isEditMode && editPost) {
         // Update existing post
-        const updateRequest = {
+        const updateRequest: UpdateMomentRequest = {
           caption: caption || undefined,
           visibility,
           specificUserId

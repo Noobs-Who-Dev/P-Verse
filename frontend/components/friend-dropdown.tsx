@@ -12,7 +12,8 @@ export type FeedFilterOption = 'all' | 'friends' | 'mine' | `friend-${number}`;
 interface FilterOption {
   id: FeedFilterOption;
   name: string;
-  icon: typeof Globe;
+  icon: typeof Globe | null;
+  friend?: UserSearchDto;
 }
 
 const baseFilterOptions: FilterOption[] = [
@@ -91,7 +92,7 @@ export function FriendDropdown({ selectedFilter, onSelectFilter }: FriendDropdow
               className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted focus:bg-muted text-foreground"
             >
               <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
-                <Icon className="w-5 h-5 text-muted-foreground" />
+                {Icon && <Icon className="w-5 h-5 text-muted-foreground" />}
               </div>
               <span className="text-sm">{option.name}</span>
             </DropdownMenuItem>

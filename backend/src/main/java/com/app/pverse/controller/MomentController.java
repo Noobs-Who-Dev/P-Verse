@@ -516,6 +516,18 @@ public class MomentController {
                     .body(ApiResponse.error(e.getMessage()));
         } catch (IllegalStateException e) {
             log.error("Cannot comment", e);
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error commenting on moment", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to comment on moment: " + e.getMessage()));
+        }
+    }
+
+    /**
      * Lấy danh sách moments gần đây từ bạn bè cho notifications
      * GET /api/moments/notifications/recent?limit=10
      */
@@ -587,10 +599,10 @@ public class MomentController {
                     .status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
-            log.error("Error commenting on moment", e);
+            log.error("Error deleting notification", e);
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Failed to comment on moment: " + e.getMessage()));
+                    .body(ApiResponse.error("Failed to delete notification: " + e.getMessage()));
         }
     }
 }

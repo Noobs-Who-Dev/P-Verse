@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/sidebar"
 import { SearchPanel } from "@/components/search-panel"
 import { NotificationsPanel } from "@/components/notifications-panel"
 import { CreatePostModal } from "@/components/create-post-modal"
+import { MessengerPopup } from "@/components/messenger-popup"
 import {
   User,
   Users,

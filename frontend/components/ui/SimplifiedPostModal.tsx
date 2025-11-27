@@ -71,7 +71,7 @@ export default function SimplifiedPostModal({ id, onClose }: SimplePostModalProp
           {/* User Info */}
           <div className="px-6 py-4 border-t border-border flex items-center gap-3">
             <Avatar className="w-10 h-10">
-              <AvatarImage src={getAvatarUrl(displayPost?.user.avatarUrl)} />
+              <AvatarImage src={getAvatarUrl(displayPost?.user.avatarUrl || null)} />
               <AvatarFallback>
                 {displayPost?.user.displayName?.charAt(0).toUpperCase() ||
                   displayPost?.user.username.charAt(0).toUpperCase()}

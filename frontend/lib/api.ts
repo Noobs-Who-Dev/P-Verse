@@ -342,7 +342,7 @@ export async function getRecentReactions(momentId: number): Promise<{
         userId: number;
         username: string;
         avatarUrl: string;
-        reactionType: string;
+        reactionType: ReactionType;
         createdAt: string;
       }>;
     }>>(`/moments/${momentId}/reactions/recent`);
@@ -387,7 +387,7 @@ export async function getMomentActivity(momentId: number): Promise<{
         userId: number;
         username: string;
         avatarUrl: string;
-        reactionType: string;
+        reactionType: ReactionType;
         emoji: string;
         reactedAt: string;
       }>;
@@ -625,6 +625,10 @@ export async function commentOnMoment(
     return response.data.data;
   } catch (error) {
     console.error('[API] Comment on moment failed:', error);
+    throw error;
+  }
+}
+
 /**
  * Get recent friend moments for notifications
  * GET /api/moments/notifications/recent?limit=10
@@ -632,14 +636,14 @@ export async function commentOnMoment(
 export async function getRecentFriendMomentsForNotifications(limit: number = 10): Promise<Array<{
   notificationId: number;
   type: string;
-  sender: UserSummaryDto;
+  sender: UserSearchDto;
   moment: MomentResponseDTO;
 }>> {
   try {
     const response = await axiosInstance.get<ApiResponse<Array<{
       notificationId: number;
       type: string;
-      sender: UserSummaryDto;
+      sender: UserSearchDto;
       moment: MomentResponseDTO;
     }>>>(`/moments/notifications/recent`, {
       params: { limit }

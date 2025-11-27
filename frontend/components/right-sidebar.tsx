@@ -170,19 +170,11 @@ export function RightSidebar() {
                     <Button
                       variant="ghost"
                       className="text-[#0095f6] text-xs font-semibold hover:text-white h-auto p-0 flex-shrink-0"
+                      onClick={() => handleMessageClick(friend)}
                     >
                       {t('message')}
                     </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    className="text-[#0095f6] text-xs font-semibold hover:text-white h-auto p-0"
-                    onClick={() => handleMessageClick(friend)}
-                  >
-                    Message
-                  </Button>
-                </div>
-              ))
                 )
               })
             )}
