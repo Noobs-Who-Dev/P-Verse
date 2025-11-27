@@ -252,6 +252,20 @@ export const translations = {
     message: "Nhắn tin",
     noFriendsFound: "Không tìm thấy bạn bè",
 
+    // User Status
+    activeNow: "Đang hoạt động",
+    activeMinutesAgo: "Hoạt động {minutes} phút trước",
+    activeHoursAgo: "Hoạt động {hours} giờ trước",
+    activeYesterday: "Hoạt động hôm qua",
+    activeDaysAgo: "Hoạt động {days} ngày trước",
+    activeLongAgo: "Hoạt động lâu rồi",
+    online: "Trực tuyến",
+    offline: "Ngoại tuyến",
+    // Short format for avatar overlay (Facebook style)
+    shortMinutesAgo: "{minutes}p",
+    shortHoursAgo: "{hours}g",
+    shortDaysAgo: "{days}n",
+
     // Notification Settings Details
     notificationDetails: "Chi tiết thông báo",
     desktopNotificationsDesc: "Nhận thông báo trên máy tính của bạn khi bạn không sử dụng ứng dụng.",
@@ -521,6 +535,20 @@ export const translations = {
     loadingFriends: "Loading friends...",
     noFriendsYet: "No friends yet",
     searchAndAddFriends: "Search and add friends to see them here",
+
+    // User Status
+    activeNow: "Active now",
+    activeMinutesAgo: "Active {minutes}m ago",
+    activeHoursAgo: "Active {hours}h ago",
+    activeYesterday: "Active yesterday",
+    activeDaysAgo: "Active {days}d ago",
+    activeLongAgo: "Active long ago",
+    online: "Online",
+    offline: "Offline",
+    // Short format for avatar overlay (Facebook style)
+    shortMinutesAgo: "{minutes}m",
+    shortHoursAgo: "{hours}h",
+    shortDaysAgo: "{days}d",
 
     // Settings Social Section
     pendingFriendRequests: "Pending Friend Requests",

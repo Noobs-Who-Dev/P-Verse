@@ -28,6 +28,9 @@ import { ReportProblemModal } from "@/components/report-problem-modal"
 import { YourActivityModal } from "@/components/your-activity-modal"
 import { settingsService } from "@/app/(protected)/services/settingsService"
 import { useToast } from "@/hooks/use-toast"
+import { UserStatusIndicator } from "@/components/ui/user-status-indicator"
+import { useUserStatus } from "@/lib/contexts/UserStatusContext"
+import { UserStatus } from "@/lib/types/userStatus"
 
 const navItems = [
   { icon: Home, label: "Home", key: "home" as const },
@@ -49,6 +52,7 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
   const { t, language } = useI18n()
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()
+  const { myStatus } = useUserStatus() // Get current user status
   const [activeItem, setActiveItem] = useState("Home")
   const [showMoreDropdown, setShowMoreDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
@@ -148,10 +152,17 @@ export function Sidebar({ collapsed, onNavClick }: SidebarProps) {
               title={collapsed ? t(item.key) : undefined}
             >
               {item.label === "Profile" ? (
-                <Avatar className="w-6 h-6">
-                  <AvatarImage src={getAvatarUrl(user?.avatarUrl)} />
-                  <AvatarFallback>{user?.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
-                </Avatar>
+                <div className="relative">
+                  <Avatar className="w-6 h-6">
+                    <AvatarImage src={getAvatarUrl(user?.avatarUrl)} />
+                    <AvatarFallback>{user?.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
+                  </Avatar>
+                  <UserStatusIndicator
+                    status={myStatus || UserStatus.OFFLINE}
+                    size="sm"
+                    className="absolute -bottom-0.5 -right-0.5 border-2 border-background"
+                  />
+                </div>
               ) : (
                 <item.icon className="w-6 h-6" strokeWidth={activeItem === item.label ? 2.5 : 2} />
               )}

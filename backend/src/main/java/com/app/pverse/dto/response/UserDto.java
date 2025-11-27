@@ -1,5 +1,6 @@
 package com.app.pverse.dto.response;
 
+import com.app.pverse.entity.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +20,8 @@ public class UserDto {
     private String avatarUrl;
     private String bio;
     private Boolean isOnline;
+    private UserStatus status;
     private LocalDateTime lastSeenAt;
+    private LocalDateTime lastActivityAt;
     private LocalDateTime createdAt;
 }

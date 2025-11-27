@@ -60,6 +60,7 @@
     "recharts": "latest",
     "sockjs-client": "^1.6.1",
     "sonner": "latest",
+    "stompjs": "^2.3.3",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "latest",

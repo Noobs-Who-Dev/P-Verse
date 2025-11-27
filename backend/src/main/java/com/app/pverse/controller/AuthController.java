@@ -4,10 +4,13 @@ import com.app.pverse.dto.request.LoginRequest;
 import com.app.pverse.dto.request.RegisterRequest;
 import com.app.pverse.dto.response.ApiResponse;
 import com.app.pverse.dto.response.AuthResponse;
+import com.app.pverse.entity.User;
 import com.app.pverse.service.AuthService;
+import com.app.pverse.service.UserStatusService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final UserStatusService userStatusService;
 
     /**
      * Login
@@ -40,12 +44,17 @@ public class AuthController {
     }
 
     /**
-     * Logout (Client-side only, just remove token)
+     * Logout (Set user OFFLINE)
      * POST /api/auth/logout
      */
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout() {
-        // JWT stateless, server không cần làm gì
+    public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal User user) {
+        // Set user status to OFFLINE
+        if (user != null) {
+            userStatusService.setUserOffline(user.getId());
+        }
+
+        // JWT stateless, server không cần làm gì thêm
         // Client chỉ cần xóa token từ localStorage
         return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
     }

@@ -10,9 +10,15 @@ import { useToast } from "@/hooks/use-toast"
 import { addMomentReaction, getMyReaction, getRecentReactions, saveMoment, unsaveMoment, commentOnMoment, type ReactionType } from "@/lib/api"
 import { ActivityModal } from "./activity-modal"
 import { useAuth } from "@/lib/auth/authContext"
+import { useUserStatus } from "@/lib/contexts/UserStatusContext"
+import { UserStatus } from "@/lib/types/userStatus"
+import { useI18n } from "@/lib/i18n/I18nContext"
+import { getStatusIndicator, isUserOnline, getShortLastSeenText } from "@/lib/utils/userStatusUtils"
+import SimplifiedPostModal from "@/components/ui/SimplifiedPostModal"
 
 interface PostProps {
   id?: string
+  userId?: number            // User ID to fetch status
   username: string
   displayName?: string
   userAvatar: string
@@ -43,6 +49,7 @@ const reactions = [
 
 export function Post({
   id,
+  userId,
   username,
   displayName,
   userAvatar,
@@ -66,6 +73,7 @@ export function Post({
   const [isJoinedIn, setIsJoinedIn] = useState(false)
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const [isActivityOpen, setIsActivityOpen] = useState(false)
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false)
   const [messageInput, setMessageInput] = useState("")
   const [isSavedState, setIsSaved] = useState(isSaved)
   const [reactionCount, setReactionCount] = useState(likes || 0)
@@ -82,6 +90,18 @@ export function Post({
   }>>([])
   const { toast } = useToast()
   const { user } = useAuth()
+  const { t } = useI18n()
+
+  // Get user status from context
+  const { getUserStatus } = useUserStatus()
+  const userStatusData = userId ? getUserStatus(userId) : undefined
+
+  // Get status indicator configuration
+  const statusIndicator = getStatusIndicator(userStatusData?.status)
+  const userOnline = isUserOnline(userStatusData?.status)
+
+  // Get short time text for offline users (to show in avatar overlay)
+  const shortLastSeen = !userOnline ? getShortLastSeenText(userStatusData?.lastSeenAt, t) : null
 
   // Debug: Log isOwner prop
   console.log('🎨 [Post] Rendering:', {
@@ -350,23 +370,19 @@ export function Post({
                 <AvatarImage src={userAvatar || "/placeholder.svg?height=32&width=32&query=user+profile+avatar"} />
                 <AvatarFallback>{(displayName || username)[0].toUpperCase()}</AvatarFallback>
               </Avatar>
-              {isOnline && (
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-card rounded-full"></span>
+              {/* Status indicator dot - green (ONLINE only) */}
+              {statusIndicator.show && (
+                <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 ${statusIndicator.className} border-2 border-card rounded-full z-10`}></span>
+              )}
+              {/* Short last seen text at bottom-right corner (compact) */}
+              {!userOnline && shortLastSeen && (
+                <span className="absolute bottom-0 right-0 bg-black/70 text-white text-[7px] font-bold px-1 py-0.5 rounded-bl-md rounded-tr-lg">
+                  {shortLastSeen}
+                </span>
               )}
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-semibold">{displayName || username}</span>
-              {(status || timeAgo) && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  {status && (
-                    <>
-                      <span className={`w-1.5 h-1.5 ${isOnline ? 'bg-green-500' : 'bg-gray-400'} rounded-full`}></span>
-                      {status}
-                    </>
-                  )}
-                  {!status && timeAgo && timeAgo}
-                </span>
-              )}
             </div>
           </div>
           <button className="hover:opacity-70 transition-opacity">
@@ -379,7 +395,8 @@ export function Post({
           <img
             src={image || "/placeholder.jpg"}
             alt={`Post by ${username}`}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover cursor-pointer"
+            onClick={() => setIsPostModalOpen(true)}
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               target.src = '/placeholder.jpg';
@@ -617,6 +634,14 @@ export function Post({
         username={username}
         momentId={id ? Number(id) : undefined}
       />
+
+      {/* Post Modal */}
+      {isPostModalOpen && id && (
+        <SimplifiedPostModal
+          id={Number(id)}
+          onClose={() => setIsPostModalOpen(false)}
+        />
+      )}
     </>
   )
 }

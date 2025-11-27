@@ -1,6 +1,7 @@
 import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { API_BASE_URL } from '@/lib/api/axios';
+import { UserStatusDto } from '@/lib/types/userStatus';
 
 export interface MessageData {
   id?: number;
@@ -21,15 +22,19 @@ export interface MessageData {
 }
 
 type MessageCallback = (message: MessageData) => void;
+type UserStatusCallback = (statusUpdate: UserStatusDto) => void;
 
 class WebSocketService {
   private client: Client | null = null;
   private connected: boolean = false;
   private messageCallbacks: MessageCallback[] = [];
+  private userStatusCallbacks: UserStatusCallback[] = [];
   private currentUserId: number | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 3000;
+
+  private notificationCallbacks: ((data: any) => void)[] = [];
 
   connect(userId: number) {
     if (this.connected && this.currentUserId === userId) {
@@ -62,6 +67,7 @@ class WebSocketService {
         this.connected = true;
         this.reconnectAttempts = 0;
         this.subscribeToMessages();
+        this.subscribeToNotifications();
       },
       onStompError: (frame) => {
         console.error('❌ STOMP Error:', frame);
@@ -131,6 +137,39 @@ class WebSocketService {
 
     console.log('✅ Subscribed to', topic);
     console.log('   Subscription ID:', subscription.id);
+
+    // Subscribe to user status updates (global broadcast)
+    const statusTopic = '/topic/user-status';
+    console.log('📡 Subscribing to user status updates:', statusTopic);
+
+    this.client.subscribe(statusTopic, (message: IMessage) => {
+      try {
+        const statusUpdate: UserStatusDto = JSON.parse(message.body);
+        console.log('👤 User status update received:', statusUpdate);
+        this.notifyStatusCallbacks(statusUpdate);
+      } catch (error) {
+        console.error('❌ Error parsing status update:', error);
+      }
+    });
+  }
+
+  private subscribeToNotifications() {
+    if (!this.client) return;
+
+    const topic = '/topic/notifications';
+    console.log('📡 Subscribing to notifications:', topic);
+
+    const subscription = this.client.subscribe(topic, (message: IMessage) => {
+      try {
+        const data = JSON.parse(message.body);
+        console.log('🔔 Notification received:', data);
+        this.notifyNotificationCallbacks(data);
+      } catch (error) {
+        console.error('❌ Error parsing notification:', error);
+      }
+    });
+
+    console.log('✅ Subscribed to notifications');
   }
 
   sendMessage(message: MessageData) {
@@ -159,6 +198,20 @@ class WebSocketService {
     };
   }
 
+  onUserStatus(callback: UserStatusCallback) {
+    this.userStatusCallbacks.push(callback);
+    return () => {
+      this.userStatusCallbacks = this.userStatusCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  onNotification(callback: (data: any) => void) {
+    this.notificationCallbacks.push(callback);
+    return () => {
+      this.notificationCallbacks = this.notificationCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
   private notifyCallbacks(message: MessageData) {
     console.log('🔔 notifyCallbacks called with message:', message);
     console.log('   Number of callbacks:', this.messageCallbacks.length);
@@ -176,12 +229,37 @@ class WebSocketService {
     console.log('🔔 All callbacks notified');
   }
 
+  private notifyStatusCallbacks(statusUpdate: UserStatusDto) {
+    console.log('👤 notifyStatusCallbacks called:', statusUpdate);
+    console.log('   Number of status callbacks:', this.userStatusCallbacks.length);
+
+    this.userStatusCallbacks.forEach((callback, index) => {
+      try {
+        callback(statusUpdate);
+        console.log(`   ✅ Status callback #${index + 1} executed`);
+      } catch (error) {
+        console.error(`   ❌ Error in status callback #${index + 1}:`, error);
+      }
+    });
+  }
+
+  private notifyNotificationCallbacks(data: any) {
+    this.notificationCallbacks.forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error('❌ Error in notification callback:', error);
+      }
+    });
+  }
+
   disconnect() {
     if (this.client) {
       this.client.deactivate();
       this.connected = false;
       this.currentUserId = null;
       this.messageCallbacks = [];
+      this.userStatusCallbacks = [];
       console.log('WebSocket disconnected');
     }
   }
@@ -192,4 +270,3 @@ class WebSocketService {
 }
 
 export const websocketService = new WebSocketService();
-

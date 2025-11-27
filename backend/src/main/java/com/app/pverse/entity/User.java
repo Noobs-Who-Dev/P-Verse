@@ -51,8 +51,15 @@ public class User implements UserDetails {
     @Column(name = "is_online", nullable = false)
     private Boolean isOnline = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private UserStatus status = UserStatus.OFFLINE;
+
     @Column(name = "last_seen_at")
     private LocalDateTime lastSeenAt;
+
+    @Column(name = "last_activity_at")
+    private LocalDateTime lastActivityAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

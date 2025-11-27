@@ -9,6 +9,7 @@ import com.app.pverse.entity.Friendship;
 import com.app.pverse.entity.Moment;
 import com.app.pverse.entity.Moment.Visibility;
 import com.app.pverse.entity.MomentReaction;
+import com.app.pverse.entity.Notification;
 import com.app.pverse.entity.SavedMoment;
 import com.app.pverse.entity.User;
 import com.app.pverse.exception.InvalidVisibilityException;
@@ -16,6 +17,7 @@ import com.app.pverse.exception.MomentNotFoundException;
 import com.app.pverse.exception.UnauthorizedAccessException;
 import com.app.pverse.repository.FriendshipRepository;
 import com.app.pverse.repository.MomentRepository;
+import com.app.pverse.repository.NotificationRepository;
 import com.app.pverse.repository.SavedMomentRepository;
 import com.app.pverse.repository.UserRepository;
 import lombok.AllArgsConstructor;
@@ -25,6 +27,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -49,6 +53,8 @@ public class MomentService {
     private final FileStorageService fileStorageService;
     private final com.app.pverse.repository.MomentReactionRepository momentReactionRepository;
     private final SavedMomentRepository savedMomentRepository;
+    private final NotificationRepository notificationRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * Feed filter enum for different tab views
@@ -105,7 +111,12 @@ public class MomentService {
         Moment savedMoment = momentRepository.save(moment);
         log.info("Moment created successfully: {}", savedMoment.getId());
 
-        return toResponseDTO(savedMoment, currentUserId);
+        MomentResponseDTO responseDTO = toResponseDTO(savedMoment, currentUserId);
+
+        // Send notifications asynchronously
+        sendNotificationsAsync(savedMoment.getId(), currentUserId, responseDTO);
+
+        return responseDTO;
     }
 
     /**
@@ -906,5 +917,149 @@ public class MomentService {
                 .collect(Collectors.toList());
 
         return new org.springframework.data.domain.PageImpl<>(content, pageable, content.size());
+    }
+
+    /**
+     * Send notifications asynchronously after creating a moment
+     */
+    @Async
+    public void sendNotificationsAsync(Long momentId, Long posterId, MomentResponseDTO responseDTO) {
+        log.info("Sending notifications for moment: {} by user: {}", momentId, posterId);
+
+        List<Long> friendIds = getFriendIds(posterId);
+        // Exclude the poster from receivers
+        friendIds = friendIds.stream().filter(id -> !id.equals(posterId)).collect(Collectors.toList());
+        log.info("Filtered friend IDs (excluding poster): {}", friendIds);
+
+        User sender = userRepository.findById(posterId).orElse(null);
+        if (sender == null) {
+            log.error("Sender not found: {}", posterId);
+            return;
+        }
+
+        for (Long friendId : friendIds) {
+            User recipient = userRepository.findById(friendId).orElse(null);
+            if (recipient != null) {
+                Notification notification = Notification.builder()
+                    .recipient(recipient)
+                    .sender(sender)
+                    .referenceId(momentId)
+                    .type(Notification.NotificationType.NEW_POST)
+                    .isRead(false)
+                    .build();
+                notificationRepository.save(notification);
+                log.info("Created notification for user: {}", friendId);
+            }
+        }
+
+        // Send WebSocket notification
+        messagingTemplate.convertAndSend("/topic/notifications", responseDTO);
+        log.info("Sent WebSocket notification for moment: {}", momentId);
+    }
+
+    /**
+     * Get recent friend moments for notifications
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getRecentFriendMomentsForNotifications(Long currentUserId, int limit) {
+        log.info("Getting recent friend moments for notifications, user: {}, limit: {}", currentUserId, limit);
+
+        // Get unread notifications for the user
+        List<Notification> notifications = notificationRepository.findUnreadByRecipientId(currentUserId);
+        if (notifications.isEmpty()) {
+            log.info("No unread notifications for user: {}", currentUserId);
+            return new ArrayList<>();
+        }
+
+        // Take only the most recent 'limit' notifications
+        notifications = notifications.stream()
+            .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+            .limit(limit)
+            .collect(Collectors.toList());
+
+        // Fetch the corresponding moments
+        List<Long> momentIds = notifications.stream()
+            .map(Notification::getReferenceId)
+            .collect(Collectors.toList());
+
+        List<Moment> moments = momentRepository.findAllById(momentIds);
+
+        // Create map of momentId to moment
+        Map<Long, Moment> momentMap = moments.stream()
+            .collect(Collectors.toMap(Moment::getId, m -> m));
+
+        // Map to response with notificationId
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Notification notification : notifications) {
+            try {
+                // Null check for sender
+                if (notification.getSender() == null) {
+                    log.warn("Notification {} has null sender, skipping", notification.getId());
+                    continue;
+                }
+
+                Moment moment = momentMap.get(notification.getReferenceId());
+
+                // Skip if moment is null (for deleted moments)
+                if (moment == null) {
+                    log.warn("Notification {} references non-existent moment {}, skipping", notification.getId(), notification.getReferenceId());
+                    continue;
+                }
+
+                Map<String, Object> item = new HashMap<>();
+                item.put("notificationId", notification.getId());
+                item.put("type", notification.getType().name());
+                item.put("sender", toUserSummaryDTO(notification.getSender()));
+
+                item.put("moment", toResponseDTO(moment, currentUserId));
+
+                result.add(item);
+            } catch (Exception e) {
+                log.error("Error mapping notification {}: {}", notification.getId(), e.getMessage(), e);
+                // Continue to next notification, don't crash the API
+            }
+        }
+
+        log.info("Found {} recent friend moments for user: {}", result.size(), currentUserId);
+        return result;
+    }
+
+    /**
+     * Dismiss a notification (mark as read)
+     */
+    @Transactional
+    public void dismissNotification(Long notificationId, Long userId) {
+        log.info("Dismissing notification: {} for user: {}", notificationId, userId);
+
+        Notification notification = notificationRepository.findById(notificationId)
+            .orElseThrow(() -> new RuntimeException("Notification not found"));
+
+        // Check if user owns this notification
+        if (!notification.getRecipient().getId().equals(userId)) {
+            throw new UnauthorizedAccessException("You can only dismiss your own notifications");
+        }
+
+        notification.setIsRead(true);
+        notificationRepository.save(notification);
+        log.info("Notification dismissed: {}", notificationId);
+    }
+
+    /**
+     * Delete a notification (hard delete)
+     */
+    @Transactional
+    public void deleteNotification(Long notificationId, Long userId) {
+        log.info("Deleting notification: {} for user: {}", notificationId, userId);
+
+        Notification notification = notificationRepository.findById(notificationId)
+            .orElseThrow(() -> new RuntimeException("Notification not found"));
+
+        // Check if user owns this notification
+        if (!notification.getRecipient().getId().equals(userId)) {
+            throw new UnauthorizedAccessException("You can only delete your own notifications");
+        }
+
+        notificationRepository.deleteById(notificationId);
+        log.info("Notification deleted: {}", notificationId);
     }
 }

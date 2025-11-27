@@ -1,6 +1,7 @@
 package com.app.pverse.repository;
 
 import com.app.pverse.entity.User;
+import com.app.pverse.entity.UserStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -48,6 +49,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     void updateOnlineStatus(@Param("userId") Long userId,
                             @Param("isOnline") Boolean isOnline,
                             @Param("lastSeenAt") LocalDateTime lastSeenAt);
+
+    /**
+     * Tìm users theo status
+     */
+    List<User> findByStatus(UserStatus status);
 
     /**
      * Tìm kiếm users theo username, display_name hoặc email
