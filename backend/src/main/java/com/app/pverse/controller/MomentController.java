@@ -2,6 +2,7 @@ package com.app.pverse.controller;
 
 import com.app.pverse.dto.MomentResponseDTO;
 import com.app.pverse.dto.CursorPage;
+import com.app.pverse.dto.request.CommentMomentRequest;
 import com.app.pverse.dto.request.CreateMomentRequest;
 import com.app.pverse.dto.request.UpdateMomentRequest;
 import com.app.pverse.exception.InvalidVisibilityException;
@@ -10,6 +11,7 @@ import com.app.pverse.entity.Moment.Visibility;
 import com.app.pverse.entity.User;
 import com.app.pverse.exception.MomentNotFoundException;
 import com.app.pverse.exception.UnauthorizedAccessException;
+import com.app.pverse.service.MessageService;
 import com.app.pverse.service.MomentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +40,7 @@ import java.util.Map;
 public class MomentController {
 
     private final MomentService momentService;
+    private final MessageService messageService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -476,6 +479,50 @@ public class MomentController {
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("Failed to get user reactions: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Comment vào moment - gửi comment và ảnh moment vào chat
+     * POST /api/moments/{momentId}/comment
+     */
+    @PostMapping("/{momentId}/comment")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> commentOnMoment(
+            @PathVariable Long momentId,
+            @RequestBody CommentMomentRequest request,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("User {} commenting on moment {}: {}", userId, momentId, request.getComment());
+
+        try {
+            // Gửi comment dưới dạng message
+            var message = messageService.sendCommentAsMessage(userId, momentId, request.getComment());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("messageId", message.getId());
+            response.put("conversationId", message.getConversation().getId());
+            response.put("comment", message.getContent());
+            response.put("momentId", message.getRepliedMoment().getId());
+            response.put("momentImagePath", message.getRepliedMoment().getImagePath());
+            response.put("createdAt", message.getCreatedAt());
+
+            return ResponseEntity.ok(ApiResponse.success("Comment sent successfully", response));
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid request", e);
+            return ResponseEntity
+                    .badRequest()
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            log.error("Cannot comment", e);
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error commenting on moment", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to comment on moment: " + e.getMessage()));
         }
     }
 }

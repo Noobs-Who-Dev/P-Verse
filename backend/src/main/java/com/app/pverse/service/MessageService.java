@@ -3,10 +3,12 @@ package com.app.pverse.service;
 import com.app.pverse.entity.Conversation;
 import com.app.pverse.entity.Friendship;
 import com.app.pverse.entity.Message;
+import com.app.pverse.entity.Moment;
 import com.app.pverse.entity.User;
 import com.app.pverse.repository.ConversationRepository;
 import com.app.pverse.repository.FriendshipRepository;
 import com.app.pverse.repository.MessageRepository;
+import com.app.pverse.repository.MomentRepository;
 import com.app.pverse.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -28,6 +30,7 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
+    private final MomentRepository momentRepository;
 
     /**
      * Gửi tin nhắn giữa hai người đã kết bạn.
@@ -143,5 +146,107 @@ public class MessageService {
 
             page++;
         } while (pageResult.hasNext());
+    }
+
+    /**
+     * Gửi comment vào moment dưới dạng message với ảnh của moment đó
+     * @param commenterId ID người comment
+     * @param momentId ID của moment được comment
+     * @param commentContent Nội dung comment
+     * @return Message đã được lưu
+     */
+    @Transactional
+    public Message sendCommentAsMessage(Long commenterId, Long momentId, String commentContent) {
+        System.out.println("\n📝 MessageService.sendCommentAsMessage() called");
+        System.out.println("   Commenter ID: " + commenterId);
+        System.out.println("   Moment ID: " + momentId);
+        System.out.println("   Comment: " + commentContent);
+
+        if (commenterId == null || momentId == null) {
+            throw new IllegalArgumentException("commenterId and momentId cannot be null");
+        }
+
+        if (commentContent == null || commentContent.isBlank()) {
+            throw new IllegalArgumentException("Comment content cannot be empty");
+        }
+
+        // Tìm moment
+        System.out.println("🔍 Finding moment...");
+        Moment moment = momentRepository.findById(momentId)
+                .orElseThrow(() -> new IllegalArgumentException("Moment not found: " + momentId));
+        System.out.println("✅ Moment found, owner ID: " + moment.getUser().getId());
+
+        Long momentOwnerId = moment.getUser().getId();
+
+        // Không cho phép comment vào moment của chính mình
+        if (commenterId.equals(momentOwnerId)) {
+            throw new IllegalArgumentException("Cannot comment on your own moment");
+        }
+
+        // Kiểm tra friendship
+        System.out.println("🔍 Checking friendship status...");
+        boolean areFriends = friendshipRepository.existsFriendshipBetweenUsers(
+                commenterId, momentOwnerId, Friendship.FriendshipStatus.ACCEPTED);
+
+        if (!areFriends) {
+            System.out.println("❌ Users are not friends!");
+            throw new IllegalStateException("You must be friends to comment on moments");
+        }
+        System.out.println("✅ Users are friends");
+
+        // Tìm hoặc tạo conversation
+        System.out.println("🔍 Finding or creating conversation...");
+        Conversation conversation = conversationRepository.findByUserPair(commenterId, momentOwnerId)
+                .orElseGet(() -> {
+                    System.out.println("   Creating new conversation...");
+                    Long u1 = Math.min(commenterId, momentOwnerId);
+                    Long u2 = Math.max(commenterId, momentOwnerId);
+                    User user1 = userRepository.findById(u1)
+                            .orElseThrow(() -> new IllegalArgumentException("User not found: " + u1));
+                    User user2 = userRepository.findById(u2)
+                            .orElseThrow(() -> new IllegalArgumentException("User not found: " + u2));
+
+                    Conversation newConvo = Conversation.builder()
+                            .user1(user1)
+                            .user2(user2)
+                            .createdAt(LocalDateTime.now())
+                            .lastMessageAt(LocalDateTime.now())
+                            .build();
+                    Conversation savedConvo = conversationRepository.save(newConvo);
+                    System.out.println("   ✅ New conversation created with ID: " + savedConvo.getId());
+                    return savedConvo;
+                });
+        System.out.println("✅ Conversation ID: " + conversation.getId());
+
+        // Tìm commenter
+        System.out.println("🔍 Finding commenter...");
+        User commenter = userRepository.findById(commenterId)
+                .orElseThrow(() -> new IllegalArgumentException("Commenter not found"));
+        System.out.println("✅ Commenter found: " + commenter.getUsername());
+
+        // Tạo message với type MOMENT_REPLY
+        System.out.println("🔨 Building MOMENT_REPLY message...");
+        Message message = Message.builder()
+                .conversation(conversation)
+                .sender(commenter)
+                .messageType(Message.MessageType.MOMENT_REPLY)
+                .content(commentContent)
+                .repliedMoment(moment)
+                .isRead(false)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        System.out.println("💾 Saving message to database...");
+        Message saved = messageRepository.save(message);
+        System.out.println("✅ Message saved with ID: " + saved.getId());
+
+        // Update conversation
+        System.out.println("🔄 Updating conversation lastMessageAt...");
+        conversation.setLastMessageAt(LocalDateTime.now());
+        conversationRepository.save(conversation);
+        System.out.println("✅ Conversation updated");
+
+        System.out.println("✅ MessageService.sendCommentAsMessage() completed successfully\n");
+        return saved;
     }
 }

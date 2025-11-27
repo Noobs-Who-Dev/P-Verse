@@ -1,12 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, MoreVertical, Copy, Trash2, Edit } from "lucide-react"
+import { X, MoreVertical, Copy, Trash2, Edit, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
 import Image from "next/image"
-import { MomentResponseDTO, getMomentActivity } from "@/lib/api"
+import { MomentResponseDTO, getMomentActivity, commentOnMoment } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/lib/auth/authContext"
 
 interface Reaction {
   userId: number
@@ -28,6 +31,10 @@ export function PostDetailModal({ post, onClose, onEdit, onDelete }: PostDetailM
   const [isDeleting, setIsDeleting] = useState(false)
   const [reactions, setReactions] = useState<Reaction[]>([])
   const [loading, setLoading] = useState(false)
+  const [comment, setComment] = useState("")
+  const [isSendingComment, setIsSendingComment] = useState(false)
+  const { toast } = useToast()
+  const { user } = useAuth()
 
   // Load reactions when modal opens
   useEffect(() => {
@@ -65,6 +72,51 @@ export function PostDetailModal({ post, onClose, onEdit, onDelete }: PostDetailM
       }
       onClose()
     }, 300)
+  }
+
+  const handleSendComment = async () => {
+    if (!comment.trim()) {
+      toast({
+        title: "Empty comment",
+        description: "Please enter a comment",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Không cho phép comment vào post của chính mình
+    if (user && user.id === post.user.id) {
+      toast({
+        title: "Cannot comment",
+        description: "You cannot comment on your own post",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      setIsSendingComment(true)
+      console.log("📤 Sending comment:", { momentId: post.id, comment })
+
+      await commentOnMoment(post.id, comment)
+
+      toast({
+        title: "Comment sent!",
+        description: "Your comment has been sent to the chat",
+      })
+
+      setComment("")
+      onClose()
+    } catch (error) {
+      console.error("Failed to send comment:", error)
+      toast({
+        title: "Failed to send comment",
+        description: "Please try again",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSendingComment(false)
+    }
   }
 
   // Helper function to get avatar URL
@@ -183,6 +235,37 @@ export function PostDetailModal({ post, onClose, onEdit, onDelete }: PostDetailM
                 <span>❤️ {post.reactionCount} reacts</span>
               </div>
             </div>
+
+            {/* Comment input - chỉ hiển thị nếu không phải là post của mình */}
+            {user && user.id !== post.user.id && (
+              <div className="px-4 py-3 border-t border-border">
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Add a comment..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !isSendingComment) {
+                        handleSendComment()
+                      }
+                    }}
+                    disabled={isSendingComment}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleSendComment}
+                    disabled={isSendingComment || !comment.trim()}
+                    size="icon"
+                    className="shrink-0"
+                  >
+                    <Send className="w-5 h-5" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Your comment will be sent to the chat with this post
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

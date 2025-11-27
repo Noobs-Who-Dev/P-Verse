@@ -15,13 +15,19 @@ public class MessageDTO {
     private Long senderId;
     private Long receiverId;
     private String content;
-    private String messageType; // text, image, moment_share
+    private String messageType; // text, image, moment_reply
 
     // --- Dữ liệu phản hồi ---
     private Long id;
     private Long conversationId;
     private Boolean isRead;
     private LocalDateTime createdAt;
+
+    // --- Dữ liệu cho MOMENT_REPLY ---
+    private Long repliedMomentId;
+    private String repliedMomentImagePath;
+    private String repliedMomentCaption;
+    private Long repliedMomentOwnerId;
 
     /**
      * Hàm tiện ích: tạo DTO từ entity Message
@@ -38,7 +44,7 @@ public class MessageDTO {
             receiverId = message.getConversation().getUser1().getId();
         }
         
-        return MessageDTO.builder()
+        MessageDTO.MessageDTOBuilder builder = MessageDTO.builder()
                 .id(message.getId())
                 .conversationId(message.getConversation().getId())
                 .senderId(senderId)
@@ -46,7 +52,16 @@ public class MessageDTO {
                 .content(message.getContent())
                 .messageType(String.valueOf(message.getMessageType()))
                 .isRead(message.getIsRead())
-                .createdAt(message.getCreatedAt())
-                .build();
+                .createdAt(message.getCreatedAt());
+
+        // Add moment reply data if applicable
+        if (message.getRepliedMoment() != null) {
+            builder.repliedMomentId(message.getRepliedMoment().getId())
+                   .repliedMomentImagePath(message.getRepliedMoment().getImagePath())
+                   .repliedMomentCaption(message.getRepliedMoment().getCaption())
+                   .repliedMomentOwnerId(message.getRepliedMoment().getUser().getId());
+        }
+
+        return builder.build();
     }
 }

@@ -53,10 +53,19 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
     const unsubscribe = websocketService.onMessage((messageData: MessageData) => {
       console.log('💬 ===== MESSAGE RECEIVED IN POPUP =====');
       console.log('   Message:', messageData);
+      console.log('   Message Type:', messageData.messageType);
       console.log('   Sender ID:', messageData.senderId);
       console.log('   Receiver ID:', messageData.receiverId);
       console.log('   Current selected chat ID:', selectedChat?.id);
       console.log('   Current conversation ID:', conversationId);
+
+      // Log moment reply data if present
+      if (messageData.messageType === 'MOMENT_REPLY') {
+        console.log('🖼️ MOMENT_REPLY detected:');
+        console.log('   repliedMomentId:', messageData.repliedMomentId);
+        console.log('   repliedMomentImagePath:', messageData.repliedMomentImagePath);
+        console.log('   repliedMomentCaption:', messageData.repliedMomentCaption);
+      }
 
       // Only add message if it's for the current conversation
       if (selectedChat &&
@@ -306,27 +315,53 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
             <div className="space-y-3">
               {messages.map((msg, index) => {
                 const isOwnMessage = msg.senderId === currentUserId
+                const isMomentReply = msg.messageType === 'MOMENT_REPLY'
+
                 return (
                   <div
                     key={msg.id || index}
                     className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                      className={`max-w-[70%] rounded-2xl overflow-hidden ${
                         isOwnMessage
                           ? 'bg-[#0095f6] text-white'
                           : 'bg-muted text-foreground'
                       }`}
                     >
-                      <p className="text-sm break-words">{msg.content}</p>
-                      {msg.createdAt && (
-                        <p className="text-xs opacity-70 mt-1">
-                          {new Date(msg.createdAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
+                      {/* Hiển thị ảnh moment nếu là MOMENT_REPLY */}
+                      {isMomentReply && msg.repliedMomentImagePath && (
+                        <div className="w-full aspect-square bg-black">
+                          <img
+                            src={`${API_BASE_URL}/${msg.repliedMomentImagePath.startsWith('/') ? msg.repliedMomentImagePath.substring(1) : msg.repliedMomentImagePath}`}
+                            alt="Moment"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.error('❌ Failed to load moment image:', msg.repliedMomentImagePath);
+                              console.error('   Full URL:', `${API_BASE_URL}/${msg.repliedMomentImagePath}`);
+                              const target = e.target as HTMLImageElement;
+                              target.src = '/placeholder.jpg';
+                            }}
+                          />
+                        </div>
                       )}
+
+                      <div className="px-4 py-2">
+                        {isMomentReply && (
+                          <p className="text-xs opacity-70 mb-1">
+                            💬 Commented on {isOwnMessage ? 'your' : 'their'} moment
+                          </p>
+                        )}
+                        <p className="text-sm break-words">{msg.content}</p>
+                        {msg.createdAt && (
+                          <p className="text-xs opacity-70 mt-1">
+                            {new Date(msg.createdAt).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )

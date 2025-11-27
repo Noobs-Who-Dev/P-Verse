@@ -408,6 +408,8 @@ export default function MessagesPage() {
                   <div className="w-full space-y-4 font-normal">
                     {conversationMessages.map((msg, index) => {
                       const isOwn = msg.senderId === currentUserId
+                      const isMomentReply = msg.messageType === 'MOMENT_REPLY'
+
                       return (
                         <div key={msg.id || index} className={`flex gap-2 ${isOwn ? "justify-end" : ""}`}>
                           {!isOwn && (
@@ -418,9 +420,35 @@ export default function MessagesPage() {
                           )}
                           <div className={`flex flex-col ${isOwn ? "items-end" : ""}`}>
                             <div
-                              className={`rounded-2xl px-4 py-2 max-w-md ${isOwn ? "bg-[#0095f6] text-white" : "bg-muted text-foreground"}`}
+                              className={`rounded-2xl overflow-hidden max-w-md ${
+                                isOwn ? "bg-[#0095f6] text-white" : "bg-muted text-foreground"
+                              }`}
                             >
-                              <p className="text-sm break-words">{msg.content}</p>
+                              {/* Hiển thị ảnh moment nếu là MOMENT_REPLY */}
+                              {isMomentReply && msg.repliedMomentImagePath && (
+                                <div className="w-full aspect-square bg-black">
+                                  <img
+                                    src={`${API_BASE_URL}/${msg.repliedMomentImagePath.startsWith('/') ? msg.repliedMomentImagePath.substring(1) : msg.repliedMomentImagePath}`}
+                                    alt="Moment"
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      console.error('❌ Failed to load moment image:', msg.repliedMomentImagePath);
+                                      console.error('   Full URL:', `${API_BASE_URL}/${msg.repliedMomentImagePath}`);
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = '/placeholder.jpg';
+                                    }}
+                                  />
+                                </div>
+                              )}
+
+                              <div className="px-4 py-2">
+                                {isMomentReply && (
+                                  <p className="text-xs opacity-70 mb-1">
+                                    💬 Commented on {isOwn ? 'their' : 'your'} moment
+                                  </p>
+                                )}
+                                <p className="text-sm break-words">{msg.content}</p>
+                              </div>
                             </div>
                             {msg.createdAt && (
                               <span className="text-xs text-muted-foreground mt-1">

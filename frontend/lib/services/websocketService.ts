@@ -11,6 +11,11 @@ export interface MessageData {
   messageType: string;
   isRead?: boolean;
   createdAt?: string;
+  // MOMENT_REPLY fields
+  repliedMomentId?: number;
+  repliedMomentImagePath?: string;
+  repliedMomentCaption?: string;
+  repliedMomentOwnerId?: number;
 }
 
 type MessageCallback = (message: MessageData) => void;

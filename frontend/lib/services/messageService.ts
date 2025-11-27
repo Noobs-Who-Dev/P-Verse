@@ -9,6 +9,11 @@ export interface MessageDTO {
   messageType: string;
   isRead?: boolean;
   createdAt?: string;
+  // MOMENT_REPLY fields
+  repliedMomentId?: number;
+  repliedMomentImagePath?: string;
+  repliedMomentCaption?: string;
+  repliedMomentOwnerId?: number;
 }
 
 export interface ConversationDTO {
