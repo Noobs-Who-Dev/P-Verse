@@ -1,14 +1,15 @@
 "use client"
 
-import { Heart, MoreHorizontal, ThumbsUp, Laugh, Frown, Angry, PartyPopper, Smile, Bookmark } from "lucide-react"
+import { Heart, MoreHorizontal, ThumbsUp, Laugh, Frown, Angry, PartyPopper, Smile, Bookmark, Send } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useState, useEffect } from "react"
 import { PhotoEditModal } from "./photo-edit-modal"
 import { useToast } from "@/hooks/use-toast"
-import { addMomentReaction, getMyReaction, getRecentReactions, saveMoment, unsaveMoment, type ReactionType } from "@/lib/api"
+import { addMomentReaction, getMyReaction, getRecentReactions, saveMoment, unsaveMoment, commentOnMoment, type ReactionType } from "@/lib/api"
 import { ActivityModal } from "./activity-modal"
+import { useAuth } from "@/lib/auth/authContext"
 import { useUserStatus } from "@/lib/contexts/UserStatusContext"
 import { UserStatus } from "@/lib/types/userStatus"
 import { useI18n } from "@/lib/i18n/I18nContext"
@@ -79,6 +80,7 @@ export function Post({
   const [isReacting, setIsReacting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSendingComment, setIsSendingComment] = useState(false)
   const [recentReactors, setRecentReactors] = useState<Array<{
     userId: number;
     username: string;
@@ -87,6 +89,7 @@ export function Post({
     createdAt: string;
   }>>([])
   const { toast } = useToast()
+  const { user } = useAuth()
   const { t } = useI18n()
 
   // Get user status from context
@@ -296,6 +299,55 @@ export function Post({
     setIsEmojiPickerOpen(false)
   }
 
+  const handleSendComment = async () => {
+    if (!messageInput.trim() || !id) {
+      toast({
+        title: "Empty comment",
+        description: "Please enter a comment",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Không cho phép comment vào post của chính mình
+    if (isOwner) {
+      toast({
+        title: "Cannot comment",
+        description: "You cannot comment on your own post",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      setIsSendingComment(true)
+      console.log("📤 Sending comment from post:", { momentId: id, comment: messageInput })
+
+      await commentOnMoment(Number(id), messageInput)
+
+      toast({
+        title: "Comment sent!",
+        description: "Your comment has been sent to the chat",
+      })
+
+      setMessageInput("")
+    } catch (error) {
+      console.error("Failed to send comment:", error)
+      toast({
+        title: "Failed to send comment",
+        description: "Please try again",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSendingComment(false)
+    }
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !isSendingComment) {
+      handleSendComment()
+    }
+  }
   const SelectedReactionIcon = selectedReaction !== null ? reactions[selectedReaction].icon : Heart
   const selectedReactionColor = selectedReaction !== null ? reactions[selectedReaction].color : "currentColor"
 
@@ -474,7 +526,9 @@ export function Post({
                     placeholder="Send message..."
                     value={messageInput}
                     onChange={(e) => setMessageInput(e.target.value)}
-                    className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+                    onKeyPress={handleKeyPress}
+                    disabled={isSendingComment}
+                    className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
                   />
                   <div className="flex items-center gap-2">
                     {/* Edit photo icon */}
@@ -484,6 +538,7 @@ export function Post({
                       className="h-8 w-8 hover:bg-secondary"
                       onClick={() => setIsEditModalOpen(true)}
                       title="Edit photo"
+                      disabled={isSendingComment}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -508,6 +563,7 @@ export function Post({
                           size="icon"
                           className="h-8 w-8 hover:bg-secondary relative"
                           title="Add emoji"
+                          disabled={isSendingComment}
                         >
                           <Smile className="w-5 h-5 scale-150" />
                         </Button>
@@ -526,6 +582,18 @@ export function Post({
                         </div>
                       </PopoverContent>
                     </Popover>
+
+                    {/* Send button */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 hover:bg-secondary"
+                      onClick={handleSendComment}
+                      disabled={isSendingComment || !messageInput.trim()}
+                      title="Send comment"
+                    >
+                      <Send className="w-5 h-5" />
+                    </Button>
                   </div>
                 </div>
 

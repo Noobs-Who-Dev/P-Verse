@@ -9,6 +9,13 @@ export interface MessageDTO {
   messageType: string;
   isRead?: boolean;
   createdAt?: string;
+  // IMAGE fields
+  imagePath?: string;
+  // MOMENT_REPLY fields
+  repliedMomentId?: number;
+  repliedMomentImagePath?: string;
+  repliedMomentCaption?: string;
+  repliedMomentOwnerId?: number;
 }
 
 export interface ConversationDTO {
@@ -56,7 +63,43 @@ class MessageService {
     const response = await axiosInstance.get(`/chat/conversations/${userId}`);
     return response.data;
   }
+
+  async sendImageMessage(
+    senderId: number,
+    receiverId: number,
+    image: File,
+    caption?: string
+  ): Promise<MessageDTO> {
+    console.log('🖼️ Sending image message...');
+    console.log('   From:', senderId, 'To:', receiverId);
+    console.log('   Image:', image.name, '(' + (image.size / 1024).toFixed(2) + ' KB)');
+
+    const formData = new FormData();
+    formData.append('image', image);
+    formData.append('senderId', senderId.toString());
+    formData.append('receiverId', receiverId.toString());
+    if (caption && caption.trim()) {
+      formData.append('caption', caption.trim());
+    }
+
+    const response = await axiosInstance.post('/chat/send-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    console.log('✅ Image message sent successfully');
+    return response.data;
+  }
 }
 
-export const messageService = new MessageService();
+// Create singleton instance
+const messageServiceInstance = new MessageService();
+
+// Export as named export
+export { messageServiceInstance as messageService };
+
+// Also export default for compatibility
+export default messageServiceInstance;
+
 

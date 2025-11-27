@@ -594,6 +594,37 @@ export interface UpdateMomentRequest {
   specificUserId?: number;
 }
 
+// ============================================
+// MOMENT COMMENT API
+// ============================================
+
+/**
+ * Comment on a moment - sends the comment with moment image to chat
+ * POST /api/moments/{momentId}/comment
+ */
+export async function commentOnMoment(
+  momentId: number,
+  comment: string
+): Promise<{
+  messageId: number;
+  conversationId: number;
+  comment: string;
+  momentId: number;
+  momentImagePath: string;
+  createdAt: string;
+}> {
+  try {
+    const response = await axiosInstance.post<ApiResponse<{
+      messageId: number;
+      conversationId: number;
+      comment: string;
+      momentId: number;
+      momentImagePath: string;
+      createdAt: string;
+    }>>(`/moments/${momentId}/comment`, { momentId, comment });
+    return response.data.data;
+  } catch (error) {
+    console.error('[API] Comment on moment failed:', error);
 /**
  * Get recent friend moments for notifications
  * GET /api/moments/notifications/recent?limit=10

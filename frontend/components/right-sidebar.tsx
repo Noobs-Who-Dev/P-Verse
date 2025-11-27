@@ -7,17 +7,22 @@ import { Button } from "@/components/ui/button"
 import { friendService, type UserSearchDto } from "@/lib/services/friendService"
 import { API_BASE_URL } from "@/lib/api/axios"
 import { AccountSwitcherModal } from "@/components/account-switcher-modal"
+import { MessengerPopup } from "@/components/messenger-popup"
 import { useI18n } from "@/lib/i18n/I18nContext"
+import { useRouter } from "next/navigation"
 import { useUserStatus } from "@/lib/contexts/UserStatusContext"
 import { getStatusIndicator, isUserOnline, getShortLastSeenText } from "@/lib/utils/userStatusUtils"
 
 export function RightSidebar() {
   const { user } = useAuth()
   const { t } = useI18n()
+  const router = useRouter()
   const { myStatus, getUserStatus, userStatuses } = useUserStatus() // Get user status
   const [friends, setFriends] = useState<UserSearchDto[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showAccountSwitcher, setShowAccountSwitcher] = useState(false)
+  const [isMessengerOpen, setIsMessengerOpen] = useState(false)
+  const [selectedFriend, setSelectedFriend] = useState<UserSearchDto | null>(null)
 
   useEffect(() => {
     loadFriends()
@@ -47,6 +52,22 @@ export function RightSidebar() {
   const handleSwitchAccount = () => {
     // Show account switcher modal
     setShowAccountSwitcher(true)
+  }
+
+  const handleMessageClick = (friend: UserSearchDto) => {
+    console.log('📱 Opening messenger for friend:', friend.username)
+    setSelectedFriend(friend)
+    setIsMessengerOpen(true)
+  }
+
+  const handleOpenFullMessenger = (username?: string) => {
+    console.log('📱 Opening full messenger page for:', username)
+    setIsMessengerOpen(false)
+    if (username) {
+      router.push(`/messages?user=${username}`)
+    } else {
+      router.push('/messages')
+    }
   }
 
   const getAvatarUrl = (avatarUrl?: string) => {
@@ -153,6 +174,15 @@ export function RightSidebar() {
                       {t('message')}
                     </Button>
                   </div>
+                  <Button
+                    variant="ghost"
+                    className="text-[#0095f6] text-xs font-semibold hover:text-white h-auto p-0"
+                    onClick={() => handleMessageClick(friend)}
+                  >
+                    Message
+                  </Button>
+                </div>
+              ))
                 )
               })
             )}
@@ -176,6 +206,14 @@ export function RightSidebar() {
       <AccountSwitcherModal
         isOpen={showAccountSwitcher}
         onClose={() => setShowAccountSwitcher(false)}
+      />
+
+      {/* Messenger Popup */}
+      <MessengerPopup
+        isOpen={isMessengerOpen}
+        onToggle={() => setIsMessengerOpen(!isMessengerOpen)}
+        onOpenFullMessenger={handleOpenFullMessenger}
+        initialSelectedFriend={selectedFriend}
       />
     </aside>
   )

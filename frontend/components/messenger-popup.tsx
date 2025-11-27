@@ -12,9 +12,10 @@ interface MessengerPopupProps {
   isOpen: boolean
   onToggle: () => void
   onOpenFullMessenger: (username?: string) => void
+  initialSelectedFriend?: UserSearchDto | null
 }
 
-export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: MessengerPopupProps) {
+export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger, initialSelectedFriend }: MessengerPopupProps) {
   const [recentChats, setRecentChats] = useState<UserSearchDto[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [selectedChat, setSelectedChat] = useState<UserSearchDto | null>(null)
@@ -23,6 +24,15 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Auto select friend when initialSelectedFriend changes
+  useEffect(() => {
+    if (initialSelectedFriend && isOpen) {
+      console.log('🎯 Auto-selecting friend from right sidebar:', initialSelectedFriend.username)
+      handleChatClick(initialSelectedFriend)
+    }
+  }, [initialSelectedFriend, isOpen])
 
   useEffect(() => {
     if (isOpen) {
@@ -53,10 +63,19 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
     const unsubscribe = websocketService.onMessage((messageData: MessageData) => {
       console.log('💬 ===== MESSAGE RECEIVED IN POPUP =====');
       console.log('   Message:', messageData);
+      console.log('   Message Type:', messageData.messageType);
       console.log('   Sender ID:', messageData.senderId);
       console.log('   Receiver ID:', messageData.receiverId);
       console.log('   Current selected chat ID:', selectedChat?.id);
       console.log('   Current conversation ID:', conversationId);
+
+      // Log moment reply data if present
+      if (messageData.messageType === 'MOMENT_REPLY') {
+        console.log('🖼️ MOMENT_REPLY detected:');
+        console.log('   repliedMomentId:', messageData.repliedMomentId);
+        console.log('   repliedMomentImagePath:', messageData.repliedMomentImagePath);
+        console.log('   repliedMomentCaption:', messageData.repliedMomentCaption);
+      }
 
       // Only add message if it's for the current conversation
       if (selectedChat &&
@@ -150,6 +169,12 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
   }
 
   const handleChatClick = async (friend: UserSearchDto) => {
+    // Prevent clicking on the same chat that is already selected
+    if (selectedChat && selectedChat.id === friend.id) {
+      console.log('⚠️ Already chatting with', friend.username);
+      return;
+    }
+
     console.log('💬 Chat clicked:', friend.username);
     setSelectedChat(friend)
     setMessages([])
@@ -172,7 +197,16 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
       if (conversation) {
         console.log('✅ Found existing conversation:', conversation.id);
         setConversationId(conversation.id)
-        // Load messages will be called by useEffect when conversationId changes
+
+        // Load messages immediately
+        console.log('📥 Loading messages from database...');
+        try {
+          const response = await messageService.getMessages(conversation.id, 0, 50)
+          console.log('✅ Messages loaded:', response.content.length, 'messages');
+          setMessages(response.content)
+        } catch (error) {
+          console.error('❌ Failed to load messages:', error)
+        }
       } else {
         console.log('⚠️ No conversation found - will be created on first message');
         // No conversation yet
@@ -236,6 +270,41 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
     }
   }
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!selectedChat || !currentUserId) {
+      console.log('❌ No chat selected or no current user')
+      return
+    }
+
+    console.log('📸 Image selected:', file.name, file.size, 'bytes')
+
+    try {
+      console.log('📤 Uploading image...')
+      const response = await messageService.sendImageMessage(
+        currentUserId,
+        selectedChat.id,
+        file
+      )
+      console.log('✅ Image message sent:', response)
+
+      // Image will be added via WebSocket
+    } catch (error) {
+      console.error('❌ Failed to send image:', error)
+    } finally {
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleImageButtonClick = () => {
+    fileInputRef.current?.click()
+  }
+
   if (!isOpen) {
     return (
       <button
@@ -291,26 +360,87 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
             <div className="space-y-3">
               {messages.map((msg, index) => {
                 const isOwnMessage = msg.senderId === currentUserId
+                const isMomentReply = msg.messageType === 'MOMENT_REPLY'
+                const isImage = msg.messageType === 'IMAGE'
+
                 return (
                   <div
                     key={msg.id || index}
                     className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                      className={`max-w-[70%] rounded-2xl overflow-hidden ${
                         isOwnMessage
                           ? 'bg-[#0095f6] text-white'
                           : 'bg-muted text-foreground'
                       }`}
                     >
-                      <p className="text-sm break-words">{msg.content}</p>
-                      {msg.createdAt && (
-                        <p className="text-xs opacity-70 mt-1">
-                          {new Date(msg.createdAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
+                      {/* Hiển thị ảnh moment nếu là MOMENT_REPLY */}
+                      {isMomentReply && msg.repliedMomentImagePath && (
+                        <div className="w-full aspect-square bg-black">
+                          <img
+                            src={`${API_BASE_URL}/${msg.repliedMomentImagePath.startsWith('/') ? msg.repliedMomentImagePath.substring(1) : msg.repliedMomentImagePath}`}
+                            alt="Moment"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.error('❌ Failed to load moment image:', msg.repliedMomentImagePath);
+                              console.error('   Full URL:', `${API_BASE_URL}/${msg.repliedMomentImagePath}`);
+                              const target = e.target as HTMLImageElement;
+                              target.src = '/placeholder.jpg';
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Hiển thị ảnh nếu là IMAGE message */}
+                      {isImage && msg.imagePath && (
+                        <div className="w-full max-w-[250px]">
+                          <img
+                            src={`${API_BASE_URL}${msg.imagePath.startsWith('/') ? msg.imagePath : '/' + msg.imagePath}`}
+                            alt="Shared image"
+                            className="w-full h-auto object-cover rounded-t-2xl"
+                            onError={(e) => {
+                              console.error('❌ Failed to load image:', msg.imagePath);
+                              console.error('   Full URL:', `${API_BASE_URL}${msg.imagePath}`);
+                              const target = e.target as HTMLImageElement;
+                              target.src = '/placeholder.jpg';
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Hiển thị text content nếu có */}
+                      {(msg.content || isMomentReply) && (
+                        <div className="px-4 py-2">
+                          {isMomentReply && (
+                            <p className="text-xs opacity-70 mb-1">
+                              💬 Commented on {isOwnMessage ? 'your' : 'their'} moment
+                            </p>
+                          )}
+                          {msg.content && (
+                            <p className="text-sm break-words">{msg.content}</p>
+                          )}
+                          {msg.createdAt && (
+                            <p className="text-xs opacity-70 mt-1">
+                              {new Date(msg.createdAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Timestamp cho IMAGE messages without caption */}
+                      {isImage && !msg.content && msg.createdAt && (
+                        <div className="px-4 py-2">
+                          <p className="text-xs opacity-70">
+                            {new Date(msg.createdAt).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -339,13 +469,23 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
             >
               <Send className="w-5 h-5" />
             </button>
-            <button className="text-muted-foreground hover:text-foreground">
+            <button
+              onClick={handleImageButtonClick}
+              className="text-muted-foreground hover:text-foreground"
+            >
               <ImageIcon className="w-5 h-5" />
             </button>
             <button className="text-muted-foreground hover:text-foreground">
               <Smile className="w-5 h-5" />
             </button>
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            className="hidden"
+          />
         </div>
       </div>
     )
@@ -383,7 +523,12 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger }: Messen
             <button
               key={chat.id}
               onClick={() => handleChatClick(chat)}
-              className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors"
+              disabled={selectedChat?.id === chat.id}
+              className={`w-full flex items-center gap-3 p-3 transition-colors ${
+                selectedChat?.id === chat.id
+                  ? 'bg-muted cursor-not-allowed opacity-75'
+                  : 'hover:bg-muted/50 cursor-pointer'
+              }`}
             >
               <Avatar className="w-14 h-14">
                 <AvatarImage src={getAvatarUrl(chat.avatarUrl)} />

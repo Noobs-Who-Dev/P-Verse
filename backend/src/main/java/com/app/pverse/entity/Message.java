@@ -79,6 +79,10 @@ public class Message {
                 if (imagePath == null || imagePath.isBlank()) {
                     throw new IllegalStateException("IMAGE message must have imagePath");
                 }
+                // Content is optional for IMAGE messages (can be caption or null)
+                if (content != null && content.length() > 500) {
+                    throw new IllegalStateException("IMAGE message caption cannot exceed 500 characters");
+                }
                 break;
 
             case MOMENT_REPLY:
