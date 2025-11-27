@@ -1,7 +1,7 @@
 package com.app.pverse.controller;
 
-import com.app.pverse.dto.ActivityItemDTO;
-import com.app.pverse.dto.UserActivityStatsDTO;
+import com.app.pverse.dto.response.activity.ActivityItemDTO;
+import com.app.pverse.dto.response.activity.UserActivityStatsDTO;
 import com.app.pverse.entity.User;
 import com.app.pverse.service.ActivityService;
 import lombok.RequiredArgsConstructor;

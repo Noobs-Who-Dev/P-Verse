@@ -4,14 +4,15 @@ import com.app.pverse.dto.request.ChangePasswordRequest;
 import com.app.pverse.dto.request.RegisterRequest;
 import com.app.pverse.dto.request.UpdateProfileRequest;
 import com.app.pverse.dto.request.UpdateUserRequest;
-import com.app.pverse.dto.response.UserDto;
-import com.app.pverse.dto.response.UserProfileDto;
-import com.app.pverse.dto.response.ProfileStatsDto;
+import com.app.pverse.dto.response.user.UserDto;
+import com.app.pverse.dto.response.user.UserProfileDto;
+import com.app.pverse.dto.response.user.ProfileStatsDto;
 import com.app.pverse.entity.User;
 import com.app.pverse.entity.UserSettings;
 import com.app.pverse.repository.UserRepository;
 import com.app.pverse.repository.UserSettingsRepository;
 import com.app.pverse.repository.FriendshipRepository;
+import com.app.pverse.repository.MomentRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserSettingsRepository settingsRepository;
     private final FriendshipRepository friendshipRepository;
+    private final MomentRepository momentRepository;
     private final PasswordEncoder passwordEncoder;
 
     private String uploadDir = "uploads/avatars"; // Default value
@@ -39,11 +41,13 @@ public class UserService {
     public UserService(UserRepository userRepository,
                        UserSettingsRepository settingsRepository,
                        FriendshipRepository friendshipRepository,
+                       MomentRepository momentRepository,
                        PasswordEncoder passwordEncoder,
                        @Value("${app.upload.dir:uploads/avatars}") String uploadDir) {
         this.userRepository = userRepository;
         this.settingsRepository = settingsRepository;
         this.friendshipRepository = friendshipRepository;
+        this.momentRepository = momentRepository;
         this.passwordEncoder = passwordEncoder;
         this.uploadDir = uploadDir;
     }
@@ -175,8 +179,8 @@ public class UserService {
         // Check if viewing own profile
         boolean isOwnProfile = targetUserId.equals(viewerId);
 
-        // Get stats - wrap in try-catch to prevent 500 error
-        Long friendsCount = 0L;
+        // Count friends
+        Long friendsCount = null;
         try {
             friendsCount = friendshipRepository.countFriends(targetUserId);
         } catch (Exception e) {
@@ -184,9 +188,24 @@ public class UserService {
             System.err.println("Error counting friends for user " + targetUserId + ": " + e.getMessage());
         }
 
+        // Count posts
+        long postsCount = 0;
+        try {
+            postsCount = momentRepository.countByUserId(targetUserId);
+            System.out.println("[getUserProfile] Posts count for user " + targetUserId + ": " + postsCount);
+        } catch (Exception e) {
+            // Log error but don't fail the entire request
+            System.err.println("[getUserProfile] Error counting posts for user " + targetUserId + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        System.out.println("[getUserProfile] Building profile stats for user " + targetUserId);
+        System.out.println("  - Posts: " + postsCount);
+        System.out.println("  - Friends: " + (friendsCount != null ? friendsCount : 0));
+
         ProfileStatsDto stats = ProfileStatsDto.builder()
                 .userId(targetUserId)
-                .postsCount(0) // TODO: Implement when Post entity is ready
+                .postsCount((int) postsCount)
                 .followersCount(friendsCount != null ? friendsCount.intValue() : 0)
                 .followingCount(friendsCount != null ? friendsCount.intValue() : 0)
                 .build();

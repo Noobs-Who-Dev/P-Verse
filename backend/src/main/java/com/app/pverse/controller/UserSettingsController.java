@@ -2,7 +2,7 @@ package com.app.pverse.controller;
 
 import com.app.pverse.dto.request.UpdateSettingsRequest;
 import com.app.pverse.dto.response.ApiResponse;
-import com.app.pverse.dto.response.UserSettingsDto;
+import com.app.pverse.dto.response.user.UserSettingsDto;
 import com.app.pverse.entity.UserSettings;
 import com.app.pverse.service.UserSettingsService;
 import lombok.RequiredArgsConstructor;

@@ -1,4 +1,4 @@
-package com.app.pverse.dto.response;
+package com.app.pverse.dto.response.user;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -1,7 +1,7 @@
 package com.app.pverse.controller;
 
-import com.app.pverse.dto.MomentResponseDTO;
-import com.app.pverse.dto.CursorPage;
+import com.app.pverse.dto.response.moment.MomentResponseDTO;
+import com.app.pverse.dto.common.CursorPageDTO;
 import com.app.pverse.dto.request.CommentMomentRequest;
 import com.app.pverse.dto.request.CreateMomentRequest;
 import com.app.pverse.dto.request.UpdateMomentRequest;
@@ -243,7 +243,7 @@ public class MomentController {
      * GET /api/moments/feed/cursor?cursor={base64}&limit=20
      */
     @GetMapping("/feed/cursor")
-    public ResponseEntity<ApiResponse<CursorPage<MomentResponseDTO>>> getFeedWithCursor(
+    public ResponseEntity<ApiResponse<CursorPageDTO<MomentResponseDTO>>> getFeedWithCursor(
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "20") int limit,
             @AuthenticationPrincipal User currentUser) {
@@ -252,7 +252,7 @@ public class MomentController {
         log.info("Getting moment feed with cursor for user: {}, cursor: {}, limit: {}", userId, cursor, limit);
 
         try {
-            CursorPage<MomentResponseDTO> response = momentService.getFeedWithCursor(userId, cursor, limit);
+            CursorPageDTO<MomentResponseDTO> response = momentService.getFeedWithCursor(userId, cursor, limit);
             return ResponseEntity.ok(ApiResponse.success(response));
         } catch (IllegalArgumentException e) {
             log.error("Invalid cursor", e);

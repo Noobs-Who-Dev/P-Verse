@@ -103,8 +103,24 @@ public class MessageService {
         Message saved = messageRepository.save(message);
         System.out.println("✅ Message saved with ID: " + saved.getId());
 
-        System.out.println("🔄 Updating conversation lastMessageAt...");
+        System.out.println("🔄 Updating conversation lastMessageAt and lastMessage...");
         conversation.setLastMessageAt(LocalDateTime.now());
+        conversation.setLastMessageSenderId(senderId);
+
+        // Set last message preview based on message type
+        String lastMessagePreview;
+        if (messageType != null && messageType.equalsIgnoreCase("IMAGE")) {
+            lastMessagePreview = "📷 Photo";
+        } else if (messageType != null && messageType.equalsIgnoreCase("MOMENT_REPLY")) {
+            lastMessagePreview = "💬 Replied to moment";
+        } else {
+            // For text messages, truncate if too long
+            lastMessagePreview = content != null && content.length() > 100
+                ? content.substring(0, 100) + "..."
+                : content;
+        }
+        conversation.setLastMessage(lastMessagePreview);
+
         conversationRepository.save(conversation);
         System.out.println("✅ Conversation updated");
 
@@ -242,8 +258,10 @@ public class MessageService {
         System.out.println("✅ Message saved with ID: " + saved.getId());
 
         // Update conversation
-        System.out.println("🔄 Updating conversation lastMessageAt...");
+        System.out.println("🔄 Updating conversation lastMessageAt and lastMessage...");
         conversation.setLastMessageAt(LocalDateTime.now());
+        conversation.setLastMessageSenderId(commenterId);
+        conversation.setLastMessage("💬 Replied to moment");
         conversationRepository.save(conversation);
         System.out.println("✅ Conversation updated");
 
@@ -354,8 +372,10 @@ public class MessageService {
         System.out.println("✅ Message saved with ID: " + saved.getId());
 
         // Update conversation
-        System.out.println("🔄 Updating conversation lastMessageAt...");
+        System.out.println("🔄 Updating conversation lastMessageAt and lastMessage...");
         conversation.setLastMessageAt(LocalDateTime.now());
+        conversation.setLastMessageSenderId(senderId);
+        conversation.setLastMessage("📷 Photo");
         conversationRepository.save(conversation);
         System.out.println("✅ Conversation updated");
 

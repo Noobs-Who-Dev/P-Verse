@@ -1,4 +1,4 @@
-package com.app.pverse.dto;
+package com.app.pverse.dto.response.user;
 
 import com.app.pverse.entity.User;
 import lombok.AllArgsConstructor;
@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserSearchDto {
+public class UserSearchDTO {
     private Long id;
     private String username;
     private String email;
@@ -35,8 +35,8 @@ public class UserSearchDto {
     /**
      * Convert từ User entity sang DTO
      */
-    public static UserSearchDto fromEntity(User user, FriendshipStatusDto status) {
-        return UserSearchDto.builder()
+    public static UserSearchDTO fromEntity(User user, FriendshipStatusDto status) {
+        return UserSearchDTO.builder()
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())

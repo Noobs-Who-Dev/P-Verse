@@ -1,5 +1,6 @@
-package com.app.pverse.dto;
+package com.app.pverse.dto.response.moment;
 
+import com.app.pverse.dto.response.user.UserSummaryDTO;
 import com.app.pverse.entity.Moment.Visibility;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

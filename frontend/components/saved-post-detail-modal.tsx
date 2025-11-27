@@ -5,6 +5,9 @@ import { X, MoreVertical, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/lib/auth/authContext"
+import { commentOnMoment } from "@/lib/api"
 import Image from "next/image"
 import { MomentResponseDTO } from "@/lib/api"
 
@@ -17,15 +20,58 @@ interface SavedPostDetailModalProps {
 export function SavedPostDetailModal({ post, onClose, onSendMessage }: SavedPostDetailModalProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [message, setMessage] = useState("")
+  const [isSendingComment, setIsSendingComment] = useState(false)
+  const { toast } = useToast()
+  const { user } = useAuth()
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`)
   }
 
-  const handleSend = () => {
-    if (message.trim() === "") return
-    onSendMessage?.(post.user.username, message)
-    setMessage("")
+  const handleSendComment = async () => {
+    if (!message.trim()) {
+      toast({
+        title: "Empty comment",
+        description: "Please enter a comment",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Không cho phép comment vào post của chính mình
+    if (user && user.id === post.user.id) {
+      toast({
+        title: "Cannot comment",
+        description: "You cannot comment on your own post",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      setIsSendingComment(true)
+      console.log("📤 Sending comment from saved post:", { momentId: post.id, comment: message })
+
+      await commentOnMoment(post.id, message)
+
+      toast({
+        title: "Comment sent!",
+        description: "Your comment has been sent to the chat",
+      })
+
+      setMessage("")
+      // Không close modal, cho phép user tiếp tục xem saved post
+      // onClose()
+    } catch (error) {
+      console.error("Failed to send comment:", error)
+      toast({
+        title: "Failed to send comment",
+        description: "Please try again",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSendingComment(false)
+    }
   }
 
   const getAvatarUrl = (avatarUrl: string | null) => {
@@ -110,15 +156,23 @@ export function SavedPostDetailModal({ post, onClose, onSendMessage }: SavedPost
               <input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 rounded-full border border-border px-4 py-2 text-sm bg-background focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSendComment()
+                  }
+                }}
+                placeholder="Add a comment..."
+                disabled={isSendingComment}
+                className="flex-1 rounded-full border border-border px-4 py-2 text-sm bg-background focus:outline-none disabled:opacity-50"
               />
 
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9"
-                onClick={handleSend}
+                onClick={handleSendComment}
+                disabled={isSendingComment || !message.trim()}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

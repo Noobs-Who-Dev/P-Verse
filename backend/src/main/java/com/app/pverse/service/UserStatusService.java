@@ -1,6 +1,6 @@
 package com.app.pverse.service;
 
-import com.app.pverse.dto.response.UserStatusDto;
+import com.app.pverse.dto.response.user.UserStatusDto;
 import com.app.pverse.entity.User;
 import com.app.pverse.entity.UserStatus;
 import com.app.pverse.repository.UserRepository;

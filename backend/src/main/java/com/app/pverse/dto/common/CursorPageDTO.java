@@ -1,4 +1,4 @@
-package com.app.pverse.dto;
+package com.app.pverse.dto.common;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,7 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CursorPage<T> {
+public class CursorPageDTO<T> {
 
     /**
      * Danh sách items của page hiện tại
@@ -41,8 +41,8 @@ public class CursorPage<T> {
     /**
      * Factory method từ Slice
      */
-    public static <T> CursorPage<T> fromSlice(List<T> content, boolean hasNext) {
-        return CursorPage.<T>builder()
+    public static <T> CursorPageDTO<T> fromSlice(List<T> content, boolean hasNext) {
+        return CursorPageDTO.<T>builder()
                 .data(content)
                 .hasNext(hasNext)
                 .size(content.size())

@@ -1,6 +1,6 @@
 package com.app.pverse.service;
 
-import com.app.pverse.dto.UserSearchDto;
+import com.app.pverse.dto.response.user.UserSearchDTO;
 import com.app.pverse.entity.Friendship;
 import com.app.pverse.entity.User;
 import com.app.pverse.repository.BlockedUserRepository;
@@ -31,7 +31,7 @@ public class FriendService {
      * Tìm kiếm users theo keyword với trạng thái quan hệ bạn bè
      */
     @Transactional(readOnly = true)
-    public List<UserSearchDto> searchUsers(String keyword, Long viewerId) {
+    public List<UserSearchDTO> searchUsers(String keyword, Long viewerId) {
         log.info("Searching users with keyword: {} by viewer: {}", keyword, viewerId);
 
         // Validate viewer exists
@@ -48,9 +48,9 @@ public class FriendService {
         // Map sang DTO với friendship status
         return searchResults.stream()
                 .map(user -> {
-                    UserSearchDto.FriendshipStatusDto status =
+                    UserSearchDTO.FriendshipStatusDto status =
                             determineFriendshipStatus(viewerId, user.getId());
-                    return UserSearchDto.fromEntity(user, status);
+                    return UserSearchDTO.fromEntity(user, status);
                 })
                 .collect(Collectors.toList());
     }
@@ -58,37 +58,37 @@ public class FriendService {
     /**
      * Xác định trạng thái quan hệ bạn bè giữa viewer và target user
      */
-    private UserSearchDto.FriendshipStatusDto determineFriendshipStatus(Long viewerId, Long targetUserId) {
+    private UserSearchDTO.FriendshipStatusDto determineFriendshipStatus(Long viewerId, Long targetUserId) {
         // Kiểm tra có bị block không
         if (blockedUserRepository.hasBlockedRelationship(viewerId, targetUserId)) {
-            return UserSearchDto.FriendshipStatusDto.BLOCKED;
+            return UserSearchDTO.FriendshipStatusDto.BLOCKED;
         }
 
         // Kiểm tra friendship
         Optional<Friendship> friendship = friendshipRepository.findFriendshipBetween(viewerId, targetUserId);
 
         if (friendship.isEmpty()) {
-            return UserSearchDto.FriendshipStatusDto.STRANGER;
+            return UserSearchDTO.FriendshipStatusDto.STRANGER;
         }
 
         Friendship f = friendship.get();
 
         // Nếu đã accepted -> FRIEND
         if (f.getStatus() == Friendship.FriendshipStatus.ACCEPTED) {
-            return UserSearchDto.FriendshipStatusDto.FRIEND;
+            return UserSearchDTO.FriendshipStatusDto.FRIEND;
         }
 
         // Nếu pending -> kiểm tra ai là requester
         if (f.getStatus() == Friendship.FriendshipStatus.PENDING) {
             if (f.getRequester().getId().equals(viewerId)) {
-                return UserSearchDto.FriendshipStatusDto.PENDING_SENT;
+                return UserSearchDTO.FriendshipStatusDto.PENDING_SENT;
             } else {
-                return UserSearchDto.FriendshipStatusDto.PENDING_RECEIVED;
+                return UserSearchDTO.FriendshipStatusDto.PENDING_RECEIVED;
             }
         }
 
         // Default: STRANGER
-        return UserSearchDto.FriendshipStatusDto.STRANGER;
+        return UserSearchDTO.FriendshipStatusDto.STRANGER;
     }
 
     /**
@@ -98,7 +98,7 @@ public class FriendService {
      * - Nếu PENDING_RECEIVED -> Accept friend request (FRIEND)
      */
     @Transactional
-    public UserSearchDto.FriendshipStatusDto toggleFriendRequest(Long viewerId, Long targetUserId) {
+    public UserSearchDTO.FriendshipStatusDto toggleFriendRequest(Long viewerId, Long targetUserId) {
         log.info("Toggle friend request: viewer={}, target={}", viewerId, targetUserId);
 
         // Validate users exist
@@ -140,7 +140,7 @@ public class FriendService {
 
             case ACCEPTED:
                 // Đã là bạn -> không làm gì
-                return UserSearchDto.FriendshipStatusDto.FRIEND;
+                return UserSearchDTO.FriendshipStatusDto.FRIEND;
 
             case BLOCKED:
                 throw new IllegalStateException("Cannot send friend request: " + friendship.getStatus());
@@ -154,7 +154,7 @@ public class FriendService {
      * ✅ MỚI: Accept friend request (chỉ người nhận mới được accept)
      */
     @Transactional
-    public UserSearchDto.FriendshipStatusDto acceptFriendRequest(Long viewerId, Long requesterId) {
+    public UserSearchDTO.FriendshipStatusDto acceptFriendRequest(Long viewerId, Long requesterId) {
         log.info("Accept friend request: viewer={}, requester={}", viewerId, requesterId);
 
         // Validate users exist
@@ -182,14 +182,14 @@ public class FriendService {
         friendshipRepository.save(friendship);
         log.info("Accepted friend request: id={}", friendship.getId());
 
-        return UserSearchDto.FriendshipStatusDto.FRIEND;
+        return UserSearchDTO.FriendshipStatusDto.FRIEND;
     }
 
     /**
      * ✅ MỚI: Reject friend request (người nhận từ chối)
      */
     @Transactional
-    public UserSearchDto.FriendshipStatusDto rejectFriendRequest(Long viewerId, Long requesterId) {
+    public UserSearchDTO.FriendshipStatusDto rejectFriendRequest(Long viewerId, Long requesterId) {
         log.info("Reject friend request: viewer={}, requester={}", viewerId, requesterId);
 
         // Validate users exist
@@ -216,13 +216,13 @@ public class FriendService {
         friendshipRepository.delete(friendship);
         log.info("Rejected friend request: id={}", friendship.getId());
 
-        return UserSearchDto.FriendshipStatusDto.STRANGER;
+        return UserSearchDTO.FriendshipStatusDto.STRANGER;
     }
 
     /**
      * Tạo friend request mới
      */
-    private UserSearchDto.FriendshipStatusDto createFriendRequest(User viewer, User targetUser) {
+    private UserSearchDTO.FriendshipStatusDto createFriendRequest(User viewer, User targetUser) {
         // Đảm bảo userId < friendId
         User user = viewer.getId() < targetUser.getId() ? viewer : targetUser;
         User friend = viewer.getId() < targetUser.getId() ? targetUser : viewer;
@@ -237,28 +237,28 @@ public class FriendService {
         friendshipRepository.save(friendship);
         log.info("Created friend request: {} -> {}", viewer.getUsername(), targetUser.getUsername());
 
-        return UserSearchDto.FriendshipStatusDto.PENDING_SENT;
+        return UserSearchDTO.FriendshipStatusDto.PENDING_SENT;
     }
 
     /**
      * Hủy friend request (khi viewer là requester)
      */
-    private UserSearchDto.FriendshipStatusDto cancelFriendRequest(Friendship friendship) {
+    private UserSearchDTO.FriendshipStatusDto cancelFriendRequest(Friendship friendship) {
         friendshipRepository.delete(friendship);
         log.info("Cancelled friend request: id={}", friendship.getId());
 
-        return UserSearchDto.FriendshipStatusDto.STRANGER;
+        return UserSearchDTO.FriendshipStatusDto.STRANGER;
     }
 
     /**
      * Accept friend request (khi viewer là người nhận) - Private helper
      */
-    private UserSearchDto.FriendshipStatusDto acceptFriendRequest(Friendship friendship) {
+    private UserSearchDTO.FriendshipStatusDto acceptFriendRequest(Friendship friendship) {
         friendship.setStatus(Friendship.FriendshipStatus.ACCEPTED);
         friendshipRepository.save(friendship);
         log.info("Accepted friend request: id={}", friendship.getId());
 
-        return UserSearchDto.FriendshipStatusDto.FRIEND;
+        return UserSearchDTO.FriendshipStatusDto.FRIEND;
     }
 
     /**
@@ -283,7 +283,7 @@ public class FriendService {
      * Lấy danh sách bạn bè
      */
     @Transactional(readOnly = true)
-    public List<UserSearchDto> getFriends(Long userId) {
+    public List<UserSearchDTO> getFriends(Long userId) {
         log.info("Getting friends list for user: {}", userId);
 
         // Query 1: userId là user (ID nhỏ hơn)
@@ -299,9 +299,9 @@ public class FriendService {
         ).collect(Collectors.toList());
 
         return allFriends.stream()
-                .map(friend -> UserSearchDto.fromEntity(
+                .map(friend -> UserSearchDTO.fromEntity(
                         friend,
-                        UserSearchDto.FriendshipStatusDto.FRIEND
+                        UserSearchDTO.FriendshipStatusDto.FRIEND
                 ))
                 .collect(Collectors.toList());
     }
@@ -310,7 +310,7 @@ public class FriendService {
      * Lấy danh sách friend requests đã nhận
      */
     @Transactional(readOnly = true)
-    public List<UserSearchDto> getReceivedRequests(Long userId) {
+    public List<UserSearchDTO> getReceivedRequests(Long userId) {
         log.info("Getting received friend requests for user: {}", userId);
 
         // Query 1: userId là user (ID nhỏ hơn)
@@ -326,9 +326,9 @@ public class FriendService {
         ).collect(Collectors.toList());
 
         return allRequesters.stream()
-                .map(requester -> UserSearchDto.fromEntity(
+                .map(requester -> UserSearchDTO.fromEntity(
                         requester,
-                        UserSearchDto.FriendshipStatusDto.PENDING_RECEIVED
+                        UserSearchDTO.FriendshipStatusDto.PENDING_RECEIVED
                 ))
                 .collect(Collectors.toList());
     }
@@ -337,7 +337,7 @@ public class FriendService {
      * ✅ MỚI: Lấy danh sách friend requests đã gửi
      */
     @Transactional(readOnly = true)
-    public List<UserSearchDto> getSentRequests(Long userId) {
+    public List<UserSearchDTO> getSentRequests(Long userId) {
         log.info("Getting sent friend requests for user: {}", userId);
 
         // Query 1: userId là user (ID nhỏ hơn)
@@ -353,9 +353,9 @@ public class FriendService {
         ).collect(Collectors.toList());
 
         return allSent.stream()
-                .map(target -> UserSearchDto.fromEntity(
+                .map(target -> UserSearchDTO.fromEntity(
                         target,
-                        UserSearchDto.FriendshipStatusDto.PENDING_SENT
+                        UserSearchDTO.FriendshipStatusDto.PENDING_SENT
                 ))
                 .collect(Collectors.toList());
     }

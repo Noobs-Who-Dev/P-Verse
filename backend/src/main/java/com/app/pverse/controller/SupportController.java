@@ -1,6 +1,6 @@
 package com.app.pverse.controller;
 
-import com.app.pverse.dto.ReportProblemRequest;
+import com.app.pverse.dto.request.report.ReportProblemRequestDTO;
 import com.app.pverse.entity.ProblemReport;
 import com.app.pverse.entity.User;
 import com.app.pverse.service.SupportService;
@@ -31,7 +31,7 @@ public class SupportController {
      */
     @PostMapping("/report")
     public ResponseEntity<?> submitReport(
-            @RequestBody ReportProblemRequest request,
+            @RequestBody ReportProblemRequestDTO request,
             @AuthenticationPrincipal UserDetails userDetails
     ) {
         try {
@@ -78,7 +78,7 @@ public class SupportController {
             User user = (User) userDetails;
 
             // Create request object
-            ReportProblemRequest request = new ReportProblemRequest();
+            ReportProblemRequestDTO request = new ReportProblemRequestDTO();
             request.setUserId(user.getId());
             request.setType(type);
             request.setSubject(subject);

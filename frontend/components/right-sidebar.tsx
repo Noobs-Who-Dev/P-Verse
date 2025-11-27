@@ -60,6 +60,15 @@ export function RightSidebar() {
     setIsMessengerOpen(true)
   }
 
+  const handleToggleMessenger = () => {
+    if (isMessengerOpen) {
+      // When closing, reset selectedFriend
+      console.log('📱 Closing messenger, resetting selected friend')
+      setSelectedFriend(null)
+    }
+    setIsMessengerOpen(!isMessengerOpen)
+  }
+
   const handleOpenFullMessenger = (username?: string) => {
     console.log('📱 Opening full messenger page for:', username)
     setIsMessengerOpen(false)
@@ -203,7 +212,7 @@ export function RightSidebar() {
       {/* Messenger Popup */}
       <MessengerPopup
         isOpen={isMessengerOpen}
-        onToggle={() => setIsMessengerOpen(!isMessengerOpen)}
+        onToggle={handleToggleMessenger}
         onOpenFullMessenger={handleOpenFullMessenger}
         initialSelectedFriend={selectedFriend}
       />

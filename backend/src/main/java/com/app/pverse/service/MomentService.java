@@ -1,8 +1,8 @@
 package com.app.pverse.service;
 
-import com.app.pverse.dto.CursorPage;
-import com.app.pverse.dto.MomentResponseDTO;
-import com.app.pverse.dto.UserSummaryDTO;
+import com.app.pverse.dto.common.CursorPageDTO;
+import com.app.pverse.dto.response.moment.MomentResponseDTO;
+import com.app.pverse.dto.response.user.UserSummaryDTO;
 import com.app.pverse.dto.request.CreateMomentRequest;
 import com.app.pverse.dto.request.UpdateMomentRequest;
 import com.app.pverse.entity.Friendship;
@@ -217,7 +217,7 @@ public class MomentService {
      * @param limit Number of items to fetch
      */
     @Transactional(readOnly = true)
-    public CursorPage<MomentResponseDTO> getFeedWithCursor(Long currentUserId, String cursor, int limit) {
+    public CursorPageDTO<MomentResponseDTO> getFeedWithCursor(Long currentUserId, String cursor, int limit) {
         log.info("Getting moment feed with cursor for user: {}, cursor: {}, limit: {}",
                 currentUserId, cursor, limit);
 
@@ -264,7 +264,7 @@ public class MomentService {
             nextCursor = buildCursor(lastMoment.getCreatedAt(), lastMoment.getId());
         }
 
-        return CursorPage.<MomentResponseDTO>builder()
+        return CursorPageDTO.<MomentResponseDTO>builder()
                 .data(dtos)
                 .nextCursor(nextCursor)
                 .hasNext(hasNext)

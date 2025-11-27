@@ -1,6 +1,6 @@
 package com.app.pverse.controller;
 
-import com.app.pverse.dto.MessageDTO;
+import com.app.pverse.dto.response.message.MessageDTO;
 import com.app.pverse.entity.Message;
 import com.app.pverse.entity.Conversation;
 import com.app.pverse.service.MessageService;

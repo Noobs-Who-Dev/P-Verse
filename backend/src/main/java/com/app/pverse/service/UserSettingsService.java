@@ -1,7 +1,7 @@
 package com.app.pverse.service;
 
 import com.app.pverse.dto.request.UpdateSettingsRequest;
-import com.app.pverse.dto.response.UserSettingsDto;
+import com.app.pverse.dto.response.user.UserSettingsDto;
 import com.app.pverse.entity.User;
 import com.app.pverse.entity.UserSettings;
 import com.app.pverse.exception.ResourceNotFoundException;

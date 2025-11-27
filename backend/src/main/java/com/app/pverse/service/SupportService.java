@@ -1,6 +1,6 @@
 package com.app.pverse.service;
 
-import com.app.pverse.dto.ReportProblemRequest;
+import com.app.pverse.dto.request.report.ReportProblemRequestDTO;
 import com.app.pverse.entity.ProblemReport;
 import com.app.pverse.entity.User;
 import com.app.pverse.repository.ProblemReportRepository;
@@ -23,7 +23,7 @@ public class SupportService {
     private final FileStorageService fileStorageService;
 
     @Transactional
-    public ProblemReport submitReport(ReportProblemRequest request, MultipartFile screenshot) {
+    public ProblemReport submitReport(ReportProblemRequestDTO request, MultipartFile screenshot) {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 

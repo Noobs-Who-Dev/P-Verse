@@ -276,6 +276,48 @@ export default function MessagesPage() {
     fileInputRef.current?.click()
   }
 
+  // Get sorted chat list - conversations with messages first (sorted by last message), then friends without conversations
+  const getSortedChatList = () => {
+    if (!currentUserId) return []
+
+    // Get friends with conversations
+    const friendsWithConversations = conversations
+      .map(conversation => {
+        // Find the OTHER user in this conversation (not current user)
+        const otherUserId = conversation.user1.id === currentUserId ? conversation.user2.id : conversation.user1.id
+        const friend = friends.find(f => f.id === otherUserId)
+        if (!friend) return null
+
+        return {
+          friend,
+          conversation,
+          lastMessageAt: conversation.lastMessageAt
+        }
+      })
+      .filter(item => item !== null)
+      .sort((a, b) => {
+        // Sort by last message time (newest first)
+        if (!a!.lastMessageAt) return 1
+        if (!b!.lastMessageAt) return -1
+        return new Date(b!.lastMessageAt).getTime() - new Date(a!.lastMessageAt).getTime()
+      })
+
+    // Get friends without conversations
+    const friendsWithoutConversations = friends
+      .filter(friend => !conversations.some(c =>
+        (c.user1.id === currentUserId && c.user2.id === friend.id) ||
+        (c.user2.id === currentUserId && c.user1.id === friend.id)
+      ))
+      .map(friend => ({
+        friend,
+        conversation: null,
+        lastMessageAt: null
+      }))
+
+    // Combine: friends with messages first, then friends without messages
+    return [...friendsWithConversations, ...friendsWithoutConversations]
+  }
+
   const handleNavClick = (item: string) => {
     if (item === "Home") {
       router.push("/")
@@ -346,68 +388,79 @@ export default function MessagesPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {friends.filter(friend =>
-            friend.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            friend.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
-          ).map((friend) => {
-            const conversation = conversations.find(c =>
-              c.user1.id === friend.id || c.user2.id === friend.id
+          {getSortedChatList()
+            .filter(item =>
+              item.friend.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              item.friend.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
             )
+            .map((item) => {
+              const { friend, conversation } = item
 
-            // Get user status
-            const friendStatus = getUserStatus(friend.id)
-            const statusIndicator = getStatusIndicator(friendStatus?.status)
-            const friendOnline = isUserOnline(friendStatus?.status)
-            const shortLastSeen = !friendOnline ? getShortLastSeenText(friendStatus?.lastSeenAt, t) : null
+              // Get user status
+              const friendStatus = getUserStatus(friend.id)
+              const statusIndicator = getStatusIndicator(friendStatus?.status)
+              const friendOnline = isUserOnline(friendStatus?.status)
+              const shortLastSeen = !friendOnline ? getShortLastSeenText(friendStatus?.lastSeenAt, t) : null
 
-            return (
-              <button
-                key={friend.id}
-                onClick={() => handleSelectUser(friend)}
-                disabled={selectedUser?.id === friend.id}
-                className={`w-full flex items-center gap-3 p-4 transition-colors ${
-                  selectedUser?.id === friend.id
-                    ? "bg-muted cursor-not-allowed"
-                    : "hover:bg-muted/50 cursor-pointer"
-                }`}
-              >
-                <div className="relative">
-                  <Avatar className="w-14 h-14">
-                    <AvatarImage src={friend.avatarUrl ? `${API_BASE_URL}${friend.avatarUrl}` : "/placeholder.svg"} />
-                    <AvatarFallback>{friend.username[0].toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  {/* Status indicator - green (ONLINE only) */}
-                  {statusIndicator.show && (
-                    <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 ${statusIndicator.className} border-2 border-background rounded-full z-10`}></span>
-                  )}
-                  {/* Short last seen text at bottom-right corner (compact) */}
-                  {!friendOnline && shortLastSeen && (
-                    <span className="absolute bottom-0 right-0 bg-black/70 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-md rounded-tr-lg">
-                      {shortLastSeen}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1 text-left">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold">{friend.displayName || friend.username}</p>
-                    {conversation?.lastMessageAt && (
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(conversation.lastMessageAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+              return (
+                <button
+                  key={friend.id}
+                  onClick={() => handleSelectUser(friend)}
+                  disabled={selectedUser?.id === friend.id}
+                  className={`w-full flex items-center gap-3 p-4 transition-colors ${
+                    selectedUser?.id === friend.id
+                      ? "bg-muted cursor-not-allowed"
+                      : "hover:bg-muted/50 cursor-pointer"
+                  }`}
+                >
+                  <div className="relative">
+                    <Avatar className="w-14 h-14">
+                      <AvatarImage src={friend.avatarUrl ? `${API_BASE_URL}${friend.avatarUrl}` : "/placeholder.svg"} />
+                      <AvatarFallback>{friend.username[0].toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    {/* Status indicator - green (ONLINE only) */}
+                    {statusIndicator.show && (
+                      <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 ${statusIndicator.className} border-2 border-background rounded-full z-10`}></span>
+                    )}
+                    {/* Short last seen text at bottom-right corner (compact) */}
+                    {!friendOnline && shortLastSeen && (
+                      <span className="absolute bottom-0 right-0 bg-black/70 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-md rounded-tr-lg">
+                        {shortLastSeen}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground truncate">
-                      {conversation ? `@${friend.username}` : "Start a conversation"}
-                    </p>
+                  <div className="flex-1 text-left">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold">{friend.displayName || friend.username}</p>
+                      {conversation?.lastMessageAt && (
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(conversation.lastMessageAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground truncate max-w-[250px]">
+                        {conversation?.lastMessage ? (() => {
+                          // Check if current user sent the last message
+                          const isOwnMessage = conversation.lastMessageSenderId === currentUserId
+                          const prefix = isOwnMessage ? "You: " : ""
+                          const message = conversation.lastMessage
+                          const fullText = prefix + message
+
+                          // Truncate if too long
+                          return fullText.length > 30
+                            ? fullText.substring(0, 30) + '...'
+                            : fullText
+                        })() : "Start a conversation"}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </button>
-            )
-          })}
+                </button>
+              )
+            })}
         </div>
       </div>
 

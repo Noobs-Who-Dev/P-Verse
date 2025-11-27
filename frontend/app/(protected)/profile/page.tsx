@@ -73,7 +73,10 @@ export default function ProfilePage() {
   const loadProfile = async (userId: number) => {
     try {
       setIsLoading(true)
+      console.log('[Profile] Loading profile for user:', userId)
       const data = await profileService.getUserProfile(userId)
+      console.log('[Profile] Profile data received:', data)
+      console.log('[Profile] Posts count:', data.stats.postsCount)
       setProfile(data)
 
       // Load user posts
@@ -93,8 +96,10 @@ export default function ProfilePage() {
   const loadUserPosts = async (userId: number) => {
     try {
       setIsLoadingPosts(true)
+      console.log('[Profile] Loading posts for user:', userId)
       // Get user's own posts (mine filter)
       const data = await getMomentFeed('mine', 0, 50) // Get up to 50 posts
+      console.log('[Profile] Posts loaded:', data.content?.length || 0)
       setUserPosts(data.content || [])
     } catch (error: any) {
       console.error("Failed to load user posts:", error)
@@ -314,6 +319,11 @@ export default function ProfilePage() {
       setUserPosts(prev => prev.filter(p => p.id !== postId))
       setSavedPosts(prev => prev.filter(p => p.id !== postId))
 
+      // Reload profile to update posts count
+      if (targetUserId) {
+        loadProfile(targetUserId)
+      }
+
       toast({
         title: "Success!",
         description: "Post deleted successfully",
@@ -326,6 +336,22 @@ export default function ProfilePage() {
         variant: "destructive"
       })
     }
+  }
+
+  const handleCreatePost = (newPost: MomentResponseDTO) => {
+    console.log('[Profile] New post created:', newPost)
+    // Add to local state
+    setUserPosts(prev => [newPost, ...prev])
+
+    // Reload profile to update posts count
+    if (targetUserId) {
+      loadProfile(targetUserId)
+    }
+
+    toast({
+      title: "Success!",
+      description: "Post created successfully",
+    })
   }
 
   return (
@@ -438,11 +464,11 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-10 mb-5">
                   <div>
                     <span className="font-semibold">{profile?.stats.postsCount || 0}</span>{" "}
-                    <span className="text-foreground">post</span>
+                    <span className="text-foreground">posts</span>
                   </div>
                   <div>
-                    <span className="font-semibold">{profile?.stats.followersCount || 0}/{profile?.stats.followingCount || 0}</span>{" "}
-                    <span className="text-foreground">người bạn</span>
+                    <span className="font-semibold">{profile?.stats.followersCount || 0}</span>{" "}
+                    <span className="text-foreground">friends</span>
                   </div>
                 </div>
 
@@ -561,6 +587,7 @@ export default function ProfilePage() {
       {showCreateModal && (
         <CreatePostModal
           onClose={() => setShowCreateModal(false)}
+          onCreate={handleCreatePost}
         />
       )}
 

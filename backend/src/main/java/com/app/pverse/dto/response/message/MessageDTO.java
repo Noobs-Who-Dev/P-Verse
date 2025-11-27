@@ -1,4 +1,4 @@
-package com.app.pverse.dto;
+package com.app.pverse.dto.response.message;
 
 import lombok.*;
 import java.time.LocalDateTime;

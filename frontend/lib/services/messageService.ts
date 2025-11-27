@@ -32,6 +32,8 @@ export interface ConversationDTO {
     displayName?: string;
     avatarUrl?: string;
   };
+  lastMessage?: string;
+  lastMessageSenderId?: number;
   lastMessageAt?: string;
   createdAt: string;
 }

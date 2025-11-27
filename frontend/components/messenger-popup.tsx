@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from "react"
 import { friendService, type UserSearchDto } from "@/lib/services/friendService"
 import { API_BASE_URL } from "@/lib/api/axios"
 import { websocketService, type MessageData } from "@/lib/services/websocketService"
-import { messageService, type MessageDTO } from "@/lib/services/messageService"
+import { messageService, type MessageDTO, type ConversationDTO } from "@/lib/services/messageService"
 
 interface MessengerPopupProps {
   isOpen: boolean
@@ -17,14 +17,32 @@ interface MessengerPopupProps {
 
 export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger, initialSelectedFriend }: MessengerPopupProps) {
   const [recentChats, setRecentChats] = useState<UserSearchDto[]>([])
+  const [conversations, setConversations] = useState<ConversationDTO[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [selectedChat, setSelectedChat] = useState<UserSearchDto | null>(null)
   const [message, setMessage] = useState("")
   const [messages, setMessages] = useState<MessageDTO[]>([])
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const [shouldReloadConversations, setShouldReloadConversations] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Initialize when popup opens
+  useEffect(() => {
+    if (isOpen) {
+      console.log('🚀 Messenger popup opened, initializing...')
+      loadFriends()
+      initializeWebSocket()
+    } else {
+      // Reset state when closing
+      console.log('🔒 Messenger popup closing, resetting state')
+      setSelectedChat(null)
+      setMessages([])
+      setConversationId(null)
+      setMessage('')
+    }
+  }, [isOpen])
 
   // Auto select friend when initialSelectedFriend changes
   useEffect(() => {
@@ -35,24 +53,20 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger, initialS
   }, [initialSelectedFriend, isOpen])
 
   useEffect(() => {
-    if (isOpen) {
-      loadFriends()
-      initializeWebSocket()
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (conversationId) {
-      console.log('📥 Loading messages for conversation:', conversationId);
-      loadMessages()
-    } else {
-      console.log('⚠️ No conversationId yet, skipping message load');
-    }
-  }, [conversationId])
-
-  useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Reload conversations when shouldReloadConversations changes (triggered by receiving new message)
+  useEffect(() => {
+    if (shouldReloadConversations > 0 && isOpen) {
+      console.log('🔄 Reloading conversations due to new message...')
+      const timer = setTimeout(() => {
+        loadFriends()
+      }, 500) // Debounce 500ms to avoid too many reloads
+
+      return () => clearTimeout(timer)
+    }
+  }, [shouldReloadConversations, isOpen])
 
   useEffect(() => {
     // Subscribe to incoming messages
@@ -104,6 +118,11 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger, initialS
         console.log('⚠️ Message does not match current chat - ignoring');
         console.log('   Reason: selectedChat =', selectedChat?.id, ', sender =', messageData.senderId, ', receiver =', messageData.receiverId);
       }
+
+      // Trigger reload of conversations list to update order
+      console.log('🔄 Triggering conversation list reload...')
+      setShouldReloadConversations(prev => prev + 1)
+
       console.log('=======================================');
     });
 
@@ -129,32 +148,75 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger, initialS
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const loadMessages = async () => {
-    if (!conversationId) {
-      console.log('⚠️ loadMessages called but conversationId is null');
-      return;
-    }
-
-    console.log('📥 Loading messages from database...');
-    console.log('   Conversation ID:', conversationId);
-
-    try {
-      const response = await messageService.getMessages(conversationId, 0, 50)
-      console.log('✅ Messages loaded:', response.content.length, 'messages');
-      console.log('   Messages:', response.content);
-      setMessages(response.content)
-    } catch (error) {
-      console.error('❌ Failed to load messages:', error)
-    }
-  }
-
   const loadFriends = async () => {
+    console.log('🔄 loadFriends called')
     setIsLoading(true)
     try {
-      const data = await friendService.getFriends()
-      setRecentChats(data.slice(0, 6)) // Show only first 6 friends
+      const friendsData = await friendService.getFriends()
+      console.log('📋 Loaded friends:', friendsData.length)
+
+      // Get current user ID to load conversations
+      const userStr = localStorage.getItem('user')
+      if (userStr) {
+        const user = JSON.parse(userStr)
+        const userId = user.id
+        console.log('🆔 Current user ID:', userId)
+
+        const conversationsData = await messageService.getUserConversations(userId)
+        console.log('💬 Loaded conversations:', conversationsData.length)
+        setConversations(conversationsData)
+
+        // Sort friends: those with recent messages first
+        const friendsWithConversations = conversationsData
+          .map(conv => {
+            console.log('   Processing conversation:', conv.id, 'user1:', conv.user1.id, 'user2:', conv.user2.id, 'lastMessageAt:', conv.lastMessageAt)
+            // Find the OTHER user in the conversation (not current user)
+            const otherUserId = conv.user1.id === userId ? conv.user2.id : conv.user1.id
+            console.log('   Other user ID:', otherUserId)
+            const friend = friendsData.find(f => f.id === otherUserId)
+            if (friend) {
+              console.log('   ✅ Found friend:', friend.username, 'lastMessageAt:', conv.lastMessageAt)
+            } else {
+              console.log('   ⚠️ Friend not found for user:', otherUserId)
+            }
+            return friend ? { friend, lastMessageAt: conv.lastMessageAt } : null
+          })
+          .filter(item => item !== null)
+          .sort((a, b) => {
+            console.log('   🔄 Comparing:', a!.friend.username, '(', a!.lastMessageAt, ') vs', b!.friend.username, '(', b!.lastMessageAt, ')')
+            if (!a!.lastMessageAt) return 1
+            if (!b!.lastMessageAt) return -1
+            const timeA = new Date(a!.lastMessageAt).getTime()
+            const timeB = new Date(b!.lastMessageAt).getTime()
+            console.log('      Time A:', timeA, 'Time B:', timeB, 'Result:', timeB - timeA)
+            return timeB - timeA
+          })
+          .map(item => item!.friend)
+
+        console.log('📊 Friends with conversations (sorted):', friendsWithConversations.map(f => f.username))
+
+        // Get friends without conversations
+        const friendsWithoutConversations = friendsData.filter(friend =>
+          !conversationsData.some(c =>
+            (c.user1.id === userId && c.user2.id === friend.id) ||
+            (c.user2.id === userId && c.user1.id === friend.id)
+          )
+        )
+
+        console.log('📊 Friends without conversations:', friendsWithoutConversations.length)
+
+        // Combine and take first 6
+        const sortedFriends = [...friendsWithConversations, ...friendsWithoutConversations]
+        console.log('📊 Total sorted friends:', sortedFriends.length)
+        console.log('📊 Setting recent chats (first 6):', sortedFriends.slice(0, 6).map(f => f.username))
+        setRecentChats(sortedFriends.slice(0, 6))
+      } else {
+        console.log('⚠️ No user in localStorage, showing first 6 friends')
+        // No user, just show first 6 friends
+        setRecentChats(friendsData.slice(0, 6))
+      }
     } catch (error) {
-      console.error('Failed to load friends:', error)
+      console.error('❌ Failed to load friends:', error)
       setRecentChats([])
     } finally {
       setIsLoading(false)
@@ -176,18 +238,27 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger, initialS
     }
 
     console.log('💬 Chat clicked:', friend.username);
-    setSelectedChat(friend)
-    setMessages([])
 
-    if (!currentUserId) {
-      console.log('❌ No currentUserId');
+    // Clear previous chat state immediately
+    setMessages([])
+    setConversationId(null)
+    setSelectedChat(friend)
+
+    // Get userId directly from localStorage to avoid state timing issues
+    const userStr = localStorage.getItem('user')
+    if (!userStr) {
+      console.log('❌ No user found in localStorage');
       return;
     }
 
-    console.log('🔍 Finding conversation between user', currentUserId, 'and', friend.id);
+    const user = JSON.parse(userStr)
+    const userId = user.id
+    console.log('🆔 Current user ID:', userId);
+
+    console.log('🔍 Finding conversation between user', userId, 'and', friend.id);
     try {
       // Get conversations to find the conversation ID
-      const conversations = await messageService.getUserConversations(currentUserId)
+      const conversations = await messageService.getUserConversations(userId)
       console.log('📋 User has', conversations.length, 'conversations');
 
       const conversation = conversations.find(c =>
@@ -196,7 +267,6 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger, initialS
 
       if (conversation) {
         console.log('✅ Found existing conversation:', conversation.id);
-        setConversationId(conversation.id)
 
         // Load messages immediately
         console.log('📥 Loading messages from database...');
@@ -204,6 +274,7 @@ export function MessengerPopup({ isOpen, onToggle, onOpenFullMessenger, initialS
           const response = await messageService.getMessages(conversation.id, 0, 50)
           console.log('✅ Messages loaded:', response.content.length, 'messages');
           setMessages(response.content)
+          setConversationId(conversation.id)
         } catch (error) {
           console.error('❌ Failed to load messages:', error)
         }

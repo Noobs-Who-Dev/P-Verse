@@ -1,7 +1,7 @@
 package com.app.pverse.controller;
 
-import com.app.pverse.dto.FriendRequestDto;
-import com.app.pverse.dto.UserSearchDto;
+import com.app.pverse.dto.response.message.FriendRequestDto;
+import com.app.pverse.dto.response.user.UserSearchDTO;
 import com.app.pverse.service.FriendService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +41,7 @@ public class FriendController {
      * Empty keyword returns all users (for suggestions)
      */
     @GetMapping("/search")
-    public ResponseEntity<List<UserSearchDto>> searchUsers(
+    public ResponseEntity<List<UserSearchDTO>> searchUsers(
             @RequestParam(required = false, defaultValue = "") String keyword,
             @RequestAttribute(value = "userId", required = true) Long viewerId) {
 
@@ -49,7 +49,7 @@ public class FriendController {
 
 
         try {
-            List<UserSearchDto> results = friendService.searchUsers(keyword, viewerId);
+            List<UserSearchDTO> results = friendService.searchUsers(keyword, viewerId);
             log.info("Found {} users", results.size());
             return ResponseEntity.ok(results);
 
@@ -72,7 +72,7 @@ public class FriendController {
                 viewerId, request.getTargetUserId());
 
         try {
-            UserSearchDto.FriendshipStatusDto newStatus =
+            UserSearchDTO.FriendshipStatusDto newStatus =
                     friendService.toggleFriendRequest(viewerId, request.getTargetUserId());
 
             Map<String, Object> response = new HashMap<>();
@@ -128,13 +128,13 @@ public class FriendController {
      * GET /api/friends
      */
     @GetMapping
-    public ResponseEntity<List<UserSearchDto>> getFriends(
+    public ResponseEntity<List<UserSearchDTO>> getFriends(
             @RequestAttribute(value = "userId", required = true) Long userId) {
 
         log.info("Get friends list API: userId={}", userId);
 
         try {
-            List<UserSearchDto> friends = friendService.getFriends(userId);
+            List<UserSearchDTO> friends = friendService.getFriends(userId);
             return ResponseEntity.ok(friends);
         } catch (Exception e) {
             log.error("Error getting friends", e);
@@ -147,13 +147,13 @@ public class FriendController {
      * GET /api/friends/requests/received
      */
     @GetMapping("/requests/received")
-    public ResponseEntity<List<UserSearchDto>> getReceivedRequests(
+    public ResponseEntity<List<UserSearchDTO>> getReceivedRequests(
             @RequestAttribute(value = "userId", required = true) Long userId) {
 
         log.info("Get received requests API: userId={}", userId);
 
         try {
-            List<UserSearchDto> requests = friendService.getReceivedRequests(userId);
+            List<UserSearchDTO> requests = friendService.getReceivedRequests(userId);
             return ResponseEntity.ok(requests);
         } catch (Exception e) {
             log.error("Error getting received requests", e);
@@ -166,13 +166,13 @@ public class FriendController {
      * GET /api/friends/requests/sent
      */
     @GetMapping("/requests/sent")
-    public ResponseEntity<List<UserSearchDto>> getSentRequests(
+    public ResponseEntity<List<UserSearchDTO>> getSentRequests(
             @RequestAttribute(value = "userId", required = true) Long userId) {
 
         log.info("Get sent requests API: userId={}", userId);
 
         try {
-            List<UserSearchDto> requests = friendService.getSentRequests(userId);
+            List<UserSearchDTO> requests = friendService.getSentRequests(userId);
             return ResponseEntity.ok(requests);
         } catch (Exception e) {
             log.error("Error getting sent requests", e);
@@ -183,7 +183,7 @@ public class FriendController {
     /**
      * Helper: Tạo message dựa trên status
      */
-    private String getStatusMessage(UserSearchDto.FriendshipStatusDto status) {
+    private String getStatusMessage(UserSearchDTO.FriendshipStatusDto status) {
         return switch (status) {
             case PENDING_SENT -> "Friend request sent successfully";
             case STRANGER -> "Friend request cancelled";

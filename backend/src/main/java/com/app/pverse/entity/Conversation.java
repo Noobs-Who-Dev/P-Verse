@@ -33,6 +33,12 @@ public class Conversation {
     @JoinColumn(name = "user2_id", nullable = false)
     private User user2;
 
+    @Column(name = "last_message", length = 500)
+    private String lastMessage;
+
+    @Column(name = "last_message_sender_id")
+    private Long lastMessageSenderId;
+
     @Column(name = "last_message_at")
     private LocalDateTime lastMessageAt;
 

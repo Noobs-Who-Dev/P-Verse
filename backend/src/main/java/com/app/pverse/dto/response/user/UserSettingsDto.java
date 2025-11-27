@@ -1,4 +1,4 @@
-package com.app.pverse.dto.response;
+package com.app.pverse.dto.response.user;
 
 import com.app.pverse.entity.UserSettings.Language;
 import com.app.pverse.entity.UserSettings.Theme;
