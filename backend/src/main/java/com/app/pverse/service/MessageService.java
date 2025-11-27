@@ -31,6 +31,7 @@ public class MessageService {
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
     private final MomentRepository momentRepository;
+    private final FileStorageService fileStorageService;
 
     /**
      * Gửi tin nhắn giữa hai người đã kết bạn.
@@ -247,6 +248,118 @@ public class MessageService {
         System.out.println("✅ Conversation updated");
 
         System.out.println("✅ MessageService.sendCommentAsMessage() completed successfully\n");
+        return saved;
+    }
+
+    /**
+     * Gửi ảnh qua message
+     * @param senderId ID người gửi
+     * @param receiverId ID người nhận
+     * @param image File ảnh
+     * @param caption Caption cho ảnh (optional)
+     * @return Message đã được lưu
+     */
+    @Transactional
+    public Message sendImageMessage(Long senderId, Long receiverId, org.springframework.web.multipart.MultipartFile image, String caption) {
+        System.out.println("\n📸 MessageService.sendImageMessage() called");
+        System.out.println("   Sender ID: " + senderId);
+        System.out.println("   Receiver ID: " + receiverId);
+        System.out.println("   Image: " + image.getOriginalFilename());
+        System.out.println("   Caption: " + caption);
+
+        if (senderId == null || receiverId == null) {
+            throw new IllegalArgumentException("senderId and receiverId cannot be null");
+        }
+
+        if (senderId.equals(receiverId)) {
+            throw new IllegalArgumentException("Cannot send message to yourself");
+        }
+
+        if (image == null || image.isEmpty()) {
+            throw new IllegalArgumentException("Image file is required");
+        }
+
+        // Kiểm tra friendship
+        System.out.println("🔍 Checking friendship status...");
+        boolean areFriends = friendshipRepository.existsFriendshipBetweenUsers(
+                senderId, receiverId, Friendship.FriendshipStatus.ACCEPTED);
+
+        if (!areFriends) {
+            System.out.println("❌ Users are not friends!");
+            throw new IllegalStateException("Two users are not friends");
+        }
+        System.out.println("✅ Users are friends");
+
+        // Lưu ảnh
+        System.out.println("💾 Saving image...");
+        String imagePath = fileStorageService.saveMessageImage(image, senderId);
+        System.out.println("✅ Image saved: " + imagePath);
+
+        // Tìm hoặc tạo conversation
+        System.out.println("🔍 Finding or creating conversation...");
+        Conversation conversation = conversationRepository.findByUserPair(senderId, receiverId)
+                .orElseGet(() -> {
+                    System.out.println("   Creating new conversation...");
+                    Long u1 = Math.min(senderId, receiverId);
+                    Long u2 = Math.max(senderId, receiverId);
+                    User user1 = userRepository.findById(u1)
+                            .orElseThrow(() -> new IllegalArgumentException("User not found: " + u1));
+                    User user2 = userRepository.findById(u2)
+                            .orElseThrow(() -> new IllegalArgumentException("User not found: " + u2));
+
+                    Conversation newConvo = Conversation.builder()
+                            .user1(user1)
+                            .user2(user2)
+                            .createdAt(LocalDateTime.now())
+                            .lastMessageAt(LocalDateTime.now())
+                            .build();
+                    Conversation savedConvo = conversationRepository.save(newConvo);
+                    System.out.println("   ✅ New conversation created with ID: " + savedConvo.getId());
+                    return savedConvo;
+                });
+        System.out.println("✅ Conversation ID: " + conversation.getId());
+
+        // Tìm sender
+        System.out.println("🔍 Finding sender...");
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new IllegalArgumentException("Sender not found"));
+        System.out.println("✅ Sender found: " + sender.getUsername());
+
+        // Normalize caption - treat "undefined", "null", empty string as null
+        String normalizedCaption = caption;
+        if (caption != null && (caption.isBlank() ||
+            caption.equalsIgnoreCase("undefined") ||
+            caption.equalsIgnoreCase("null"))) {
+            normalizedCaption = null;
+            System.out.println("⚠️ Caption normalized to null");
+        }
+
+        // Tạo message với type IMAGE
+        System.out.println("🔨 Building IMAGE message...");
+        System.out.println("   Image path: " + imagePath);
+        System.out.println("   Caption: " + normalizedCaption);
+
+        Message message = Message.builder()
+                .conversation(conversation)
+                .sender(sender)
+                .messageType(Message.MessageType.IMAGE)
+                .imagePath(imagePath)
+                .content(normalizedCaption) // Caption có thể null
+                .isRead(false)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        System.out.println("💾 Saving message to database...");
+        Message saved = messageRepository.save(message);
+        System.out.println("✅ Message saved with ID: " + saved.getId());
+
+        // Update conversation
+        System.out.println("🔄 Updating conversation lastMessageAt...");
+        conversation.setLastMessageAt(LocalDateTime.now());
+        conversationRepository.save(conversation);
+        System.out.println("✅ Conversation updated");
+
+        System.out.println("✅ MessageService.sendImageMessage() completed successfully\n");
         return saved;
     }
 }

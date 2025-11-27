@@ -11,6 +11,8 @@ export interface MessageData {
   messageType: string;
   isRead?: boolean;
   createdAt?: string;
+  // IMAGE fields
+  imagePath?: string;
   // MOMENT_REPLY fields
   repliedMomentId?: number;
   repliedMomentImagePath?: string;

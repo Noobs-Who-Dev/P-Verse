@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Sidebar } from "@/components/sidebar"
-import { MessengerPopup } from "@/components/messenger-popup"
 import { SearchPanel } from "@/components/search-panel"
 import { NotificationsPanel } from "@/components/notifications-panel"
 import { CreatePostModal } from "@/components/create-post-modal"

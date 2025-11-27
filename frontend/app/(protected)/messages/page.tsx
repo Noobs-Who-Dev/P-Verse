@@ -28,6 +28,7 @@ export default function MessagesPage() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     initializeWebSocket()
@@ -235,6 +236,41 @@ export default function MessagesPage() {
     }
   }
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!selectedUser || !currentUserId) {
+      console.log('❌ No user selected or no current user')
+      return
+    }
+
+    console.log('📸 Image selected:', file.name, file.size, 'bytes')
+
+    try {
+      console.log('📤 Uploading image...')
+      const response = await messageService.sendImageMessage(
+        currentUserId,
+        selectedUser.id,
+        file
+      )
+      console.log('✅ Image message sent:', response)
+
+      // Image will be added via WebSocket
+    } catch (error) {
+      console.error('❌ Failed to send image:', error)
+    } finally {
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleImageButtonClick = () => {
+    fileInputRef.current?.click()
+  }
+
   const handleNavClick = (item: string) => {
     if (item === "Home") {
       router.push("/")
@@ -409,6 +445,7 @@ export default function MessagesPage() {
                     {conversationMessages.map((msg, index) => {
                       const isOwn = msg.senderId === currentUserId
                       const isMomentReply = msg.messageType === 'MOMENT_REPLY'
+                      const isImage = msg.messageType === 'IMAGE'
 
                       return (
                         <div key={msg.id || index} className={`flex gap-2 ${isOwn ? "justify-end" : ""}`}>
@@ -441,16 +478,50 @@ export default function MessagesPage() {
                                 </div>
                               )}
 
-                              <div className="px-4 py-2">
-                                {isMomentReply && (
-                                  <p className="text-xs opacity-70 mb-1">
-                                    💬 Commented on {isOwn ? 'their' : 'your'} moment
-                                  </p>
-                                )}
-                                <p className="text-sm break-words">{msg.content}</p>
-                              </div>
+                              {/* Hiển thị ảnh nếu là IMAGE message */}
+                              {isImage && msg.imagePath && (
+                                <div className="w-full max-w-[300px]">
+                                  <img
+                                    src={`${API_BASE_URL}${msg.imagePath.startsWith('/') ? msg.imagePath : '/' + msg.imagePath}`}
+                                    alt="Shared image"
+                                    className="w-full h-auto object-cover rounded-t-2xl"
+                                    onError={(e) => {
+                                      console.error('❌ Failed to load image:', msg.imagePath);
+                                      console.error('   Full URL:', `${API_BASE_URL}${msg.imagePath}`);
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = '/placeholder.jpg';
+                                    }}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Hiển thị text content nếu có */}
+                              {(msg.content || isMomentReply) && (
+                                <div className="px-4 py-2">
+                                  {isMomentReply && (
+                                    <p className="text-xs opacity-70 mb-1">
+                                      💬 Commented on {isOwn ? 'their' : 'your'} moment
+                                    </p>
+                                  )}
+                                  {msg.content && (
+                                    <p className="text-sm break-words">{msg.content}</p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Timestamp cho IMAGE messages without caption */}
+                              {isImage && !msg.content && msg.createdAt && (
+                                <div className="px-4 py-2">
+                                  <span className="text-xs opacity-70">
+                                    {new Date(msg.createdAt).toLocaleTimeString([], {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </span>
+                                </div>
+                              )}
                             </div>
-                            {msg.createdAt && (
+                            {msg.createdAt && (msg.content || isMomentReply) && (
                               <span className="text-xs text-muted-foreground mt-1">
                                 {new Date(msg.createdAt).toLocaleTimeString([], {
                                   hour: '2-digit',
@@ -482,7 +553,10 @@ export default function MessagesPage() {
                     placeholder="Message..."
                     className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground"
                   />
-                  <button className="text-muted-foreground hover:text-foreground">
+                  <button
+                    onClick={handleImageButtonClick}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
                     <ImageIcon className="w-5 h-5" />
                   </button>
                 </div>
@@ -499,6 +573,13 @@ export default function MessagesPage() {
                   </button>
                 )}
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
             </div>
           </>
         ) : (

@@ -6,7 +6,6 @@ import { Sidebar } from "@/components/sidebar"
 import { Feed } from "@/components/feed"
 import { FriendDropdown, FeedFilterOption } from "@/components/friend-dropdown"
 import { RightSidebar } from "@/components/right-sidebar"
-import { MessengerPopup } from "@/components/messenger-popup"
 import { SearchPanel } from "@/components/search-panel"
 import { NotificationsPanel } from "@/components/notifications-panel"
 import { CreatePostModal } from "@/components/create-post-modal"
@@ -17,7 +16,6 @@ export function InstagramLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activePanel, setActivePanel] = useState<"search" | "notifications" | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [messengerOpen, setMessengerOpen] = useState(false)
 
   const handleNavClick = (item: string) => {
     if (item === "Search") {
@@ -51,15 +49,6 @@ export function InstagramLayout() {
     setActivePanel(null)
   }
 
-  const handleOpenFullMessenger = (username?: string) => {
-    if (username) {
-      router.push(`/messages?user=${username}`)
-    } else {
-      router.push("/messages")
-    }
-    setMessengerOpen(false)
-  }
-
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex">
@@ -86,11 +75,6 @@ export function InstagramLayout() {
         <RightSidebar />
       </div>
 
-      <MessengerPopup
-        isOpen={messengerOpen}
-        onToggle={() => setMessengerOpen(!messengerOpen)}
-        onOpenFullMessenger={handleOpenFullMessenger}
-      />
 
       {showCreateModal && (
         <CreatePostModal

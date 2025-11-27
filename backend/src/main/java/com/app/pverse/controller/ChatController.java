@@ -125,4 +125,55 @@ public class ChatController {
         List<Conversation> conversations = messageService.getUserConversations(userId);
         return ResponseEntity.ok(conversations);
     }
+
+    /**
+     * Send image message via REST API
+     * POST /api/chat/send-image
+     */
+    @PostMapping(value = "/api/chat/send-image", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<MessageDTO> sendImageMessage(
+            @RequestPart("image") org.springframework.web.multipart.MultipartFile image,
+            @RequestPart("senderId") String senderIdStr,
+            @RequestPart("receiverId") String receiverIdStr,
+            @RequestPart(value = "caption", required = false) String caption) {
+
+        try {
+            System.out.println("\n=== REST API: Send Image Message ===");
+            System.out.println("Sender ID: " + senderIdStr);
+            System.out.println("Receiver ID: " + receiverIdStr);
+            System.out.println("Image: " + image.getOriginalFilename());
+            System.out.println("Caption: " + caption);
+
+            Long senderId = Long.parseLong(senderIdStr);
+            Long receiverId = Long.parseLong(receiverIdStr);
+
+            Message saved = messageService.sendImageMessage(senderId, receiverId, image, caption);
+            MessageDTO response = MessageDTO.fromEntity(saved);
+
+            System.out.println("✅ Image message saved with ID: " + saved.getId());
+
+            // Broadcast via WebSocket
+            System.out.println("📤 Broadcasting to receiver: /topic/chat/" + receiverId);
+            messagingTemplate.convertAndSend("/topic/chat/" + receiverId, response);
+            System.out.println("✅ Broadcasted to receiver");
+
+            System.out.println("📤 Broadcasting to sender: /topic/chat/" + senderId);
+            messagingTemplate.convertAndSend("/topic/chat/" + senderId, response);
+            System.out.println("✅ Broadcasted to sender");
+
+            System.out.println("=== Image Message Processing Complete ===\n");
+
+            return ResponseEntity.ok(response);
+        } catch (IllegalStateException e) {
+            System.out.println("❌ ERROR: IllegalStateException - " + e.getMessage());
+            return ResponseEntity.status(403).body(null);
+        } catch (IllegalArgumentException e) {
+            System.out.println("❌ ERROR: IllegalArgumentException - " + e.getMessage());
+            return ResponseEntity.badRequest().body(null);
+        } catch (Exception e) {
+            System.out.println("❌ ERROR: Unexpected exception - " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(null);
+        }
+    }
 }

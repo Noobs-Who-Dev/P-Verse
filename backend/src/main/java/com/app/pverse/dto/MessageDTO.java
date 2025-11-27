@@ -23,6 +23,9 @@ public class MessageDTO {
     private Boolean isRead;
     private LocalDateTime createdAt;
 
+    // --- Dữ liệu cho IMAGE ---
+    private String imagePath;
+
     // --- Dữ liệu cho MOMENT_REPLY ---
     private Long repliedMomentId;
     private String repliedMomentImagePath;
@@ -52,7 +55,8 @@ public class MessageDTO {
                 .content(message.getContent())
                 .messageType(String.valueOf(message.getMessageType()))
                 .isRead(message.getIsRead())
-                .createdAt(message.getCreatedAt());
+                .createdAt(message.getCreatedAt())
+                .imagePath(message.getImagePath()); // Add imagePath for IMAGE messages
 
         // Add moment reply data if applicable
         if (message.getRepliedMoment() != null) {

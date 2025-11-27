@@ -49,7 +49,7 @@ public class FileStorageService {
             }
 
             // Create subdirectories
-            String[] subdirs = {"moments", "avatars", "posts"};
+            String[] subdirs = {"moments", "avatars", "posts", "messages"};
             for (String subdir : subdirs) {
                 Path subdirPath = uploadPath.resolve(subdir);
                 if (!Files.exists(subdirPath)) {
@@ -90,6 +90,15 @@ public class FileStorageService {
     public String savePostImage(MultipartFile file, Long userId) {
         validateImageFile(file);
         return saveFile(file, "posts", userId.toString());
+    }
+
+    /**
+     * Lưu file message image với validation
+     * Path: uploads/messages/{userId}/{filename}
+     */
+    public String saveMessageImage(MultipartFile file, Long userId) {
+        validateImageFile(file);
+        return saveFile(file, "messages", userId.toString());
     }
 
     /**
