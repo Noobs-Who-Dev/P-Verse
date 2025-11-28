@@ -1,0 +1,608 @@
+package com.app.pverse.controller;
+
+import com.app.pverse.dto.response.moment.MomentResponseDTO;
+import com.app.pverse.dto.common.CursorPageDTO;
+import com.app.pverse.dto.request.CommentMomentRequest;
+import com.app.pverse.dto.request.CreateMomentRequest;
+import com.app.pverse.dto.request.UpdateMomentRequest;
+import com.app.pverse.exception.InvalidVisibilityException;
+import com.app.pverse.dto.response.ApiResponse;
+import com.app.pverse.entity.Moment.Visibility;
+import com.app.pverse.entity.User;
+import com.app.pverse.exception.MomentNotFoundException;
+import com.app.pverse.exception.UnauthorizedAccessException;
+import com.app.pverse.service.MessageService;
+import com.app.pverse.service.MomentService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Controller cho Moment features
+ */
+@RestController
+@RequestMapping("/api/moments")
+@RequiredArgsConstructor
+@Slf4j
+public class MomentController {
+
+    private final MomentService momentService;
+    private final MessageService messageService;
+    private final ObjectMapper objectMapper;
+
+    /**
+     * TEST ENDPOINT - Verify moment API is working
+     * GET /api/moments/test
+     */
+    @GetMapping("/test")
+    public ResponseEntity<ApiResponse<String>> test() {
+        String message = "✅ Moment API is working! Time: " + java.time.LocalDateTime.now();
+        log.info(message);
+        return ResponseEntity.ok(ApiResponse.success(message));
+    }
+
+    /**
+     * TEST ENDPOINT - Verify file upload is working
+     * POST /api/moments/test-upload
+     */
+    @PostMapping("/test-upload")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> testUpload(
+            @RequestPart("image") MultipartFile image) {
+
+        log.info("===== TEST UPLOAD =====");
+        log.info("Filename: {}", image.getOriginalFilename());
+        log.info("Size: {} bytes", image.getSize());
+        log.info("Content-Type: {}", image.getContentType());
+        log.info("=====================");
+
+        Map<String, Object> responseData = new HashMap<>();
+        responseData.put("filename", image.getOriginalFilename());
+        responseData.put("size", image.getSize());
+        responseData.put("contentType", image.getContentType());
+        responseData.put("isEmpty", image.isEmpty());
+        responseData.put("timestamp", java.time.LocalDateTime.now());
+
+        return ResponseEntity.ok(ApiResponse.success(responseData));
+    }
+
+    /**
+     * Tạo moment mới
+     * POST /api/moments
+     */
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<MomentResponseDTO>> createMoment(
+            @RequestPart("image") MultipartFile image,
+            @RequestPart(value = "caption", required = false) String caption,
+            @RequestPart("visibility") String visibilityStr,
+            @RequestPart(value = "specificUserId", required = false) String specificUserIdStr,
+            @AuthenticationPrincipal User currentUser) {
+
+        log.info("===== CREATE MOMENT REQUEST =====");
+        log.info("Image: {} ({} bytes, {})",
+                image.getOriginalFilename(),
+                image.getSize(),
+                image.getContentType());
+        log.info("Caption length: {}", caption != null ? caption.length() : 0);
+        log.info("Visibility: {}", visibilityStr);
+        log.info("SpecificUserId: {}", specificUserIdStr);
+        log.info("CurrentUser: {}", currentUser != null ? currentUser.getId() : "NULL");
+        log.info("=================================");
+
+        try {
+            // CRITICAL FIX: Handle null currentUser (no authentication)
+            Long userId;
+            if (currentUser == null) {
+                // TEMPORARY FALLBACK for development/testing
+                log.warn("⚠️ No authentication detected! Using fallback user ID.");
+                log.warn("⚠️ This should ONLY happen in development. Enable auth in production!");
+                userId = 1L; // TEMPORARY - Remove in production
+            } else {
+                userId = currentUser.getId();
+            }
+
+            // Parse visibility
+            Visibility visibility = Visibility.valueOf(visibilityStr.toUpperCase());
+
+            // Parse specificUserId if provided
+            Long specificUserId = null;
+            if (specificUserIdStr != null && !specificUserIdStr.isEmpty()) {
+                specificUserId = Long.parseLong(specificUserIdStr);
+            }
+
+            // Create request object
+            CreateMomentRequest request = CreateMomentRequest.builder()
+                    .caption(caption)
+                    .visibility(visibility)
+                    .specificUserId(specificUserId)
+                    .build();
+
+            // Create moment
+            MomentResponseDTO response = momentService.createMoment(request, image, userId);
+
+            log.info("✅ Moment created successfully with ID: {}", response.getId());
+
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(ApiResponse.success("Moment created successfully", response));
+
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid request parameters", e);
+            return ResponseEntity
+                    .badRequest()
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error creating moment", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to create moment: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Lấy moment theo ID
+     * GET /api/moments/{id}
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<MomentResponseDTO>> getMomentById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser) {
+
+        log.info("Getting moment: {} by user: {}", id, currentUser != null ? currentUser.getId() : "NULL");
+
+        try {
+            Long userId = currentUser != null ? currentUser.getId() : 1L;
+            MomentResponseDTO response = momentService.getMomentById(id, userId);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (Exception e) {
+            log.error("Error getting moment", e);
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    /**
+     * Lấy feed moments với filter (ALL, FRIENDS, MINE)
+     * GET /api/moments/feed?filter=all&page=0&size=20
+     */
+    @GetMapping("/feed")
+    public ResponseEntity<ApiResponse<Slice<MomentResponseDTO>>> getFeed(
+            @RequestParam(defaultValue = "all") String filter,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Getting moment feed for user: {}, filter: {}, page: {}, size: {}",
+                userId, filter, page, size);
+
+        try {
+            // Parse filter
+            MomentService.FeedFilter feedFilter;
+            try {
+                feedFilter = MomentService.FeedFilter.valueOf(filter.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid filter: {}, defaulting to ALL", filter);
+                feedFilter = MomentService.FeedFilter.ALL;
+            }
+
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            Slice<MomentResponseDTO> response = momentService.getFeedWithFilter(userId, feedFilter, pageable);
+
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (Exception e) {
+            log.error("Error getting moment feed", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to get moment feed: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Lấy moments của một user
+     * GET /api/moments/users/{userId}?page=0&size=20
+     */
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<ApiResponse<Slice<MomentResponseDTO>>> getUserMoments(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long viewerId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Getting moments for user: {} by viewer: {}, page: {}, size: {}", userId, viewerId, page, size);
+
+        try {
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            Slice<MomentResponseDTO> response = momentService.getUserMoments(userId, viewerId, pageable);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (Exception e) {
+            log.error("Error getting user moments", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to get user moments: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Lấy feed moments với cursor-based pagination (Infinite scroll)
+     * GET /api/moments/feed/cursor?cursor={base64}&limit=20
+     */
+    @GetMapping("/feed/cursor")
+    public ResponseEntity<ApiResponse<CursorPageDTO<MomentResponseDTO>>> getFeedWithCursor(
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "20") int limit,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Getting moment feed with cursor for user: {}, cursor: {}, limit: {}", userId, cursor, limit);
+
+        try {
+            CursorPageDTO<MomentResponseDTO> response = momentService.getFeedWithCursor(userId, cursor, limit);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid cursor", e);
+            return ResponseEntity
+                    .badRequest()
+                    .body(ApiResponse.error("Invalid cursor: " + e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error getting moment feed with cursor", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to get moment feed: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Xóa moment (chỉ owner)
+     * DELETE /api/moments/{id}
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteMoment(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Deleting moment: {} by user: {}", id, userId);
+
+        try {
+            momentService.deleteMoment(id, userId);
+            return ResponseEntity.ok(ApiResponse.success("Moment deleted successfully", null));
+        } catch (MomentNotFoundException e) {
+            log.error("Moment not found", e);
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (UnauthorizedAccessException e) {
+            log.error("Unauthorized access", e);
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error deleting moment", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to delete moment: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Cập nhật moment (chỉ owner)
+     * PUT /api/moments/{id}
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<MomentResponseDTO>> updateMoment(
+            @PathVariable Long id,
+            @ModelAttribute UpdateMomentRequest request,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Updating moment: {} by user: {}", id, userId);
+
+        try {
+            // Validate request
+            if (request.getCaption() == null && request.getVisibility() == null && image == null) {
+                return ResponseEntity
+                        .status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error("At least one field must be provided for update"));
+            }
+
+            // Set image in request if provided
+            if (image != null) {
+                request.setImage(image);
+            }
+
+            MomentResponseDTO updatedMoment = momentService.updateMoment(id, request, userId);
+            return ResponseEntity.ok(ApiResponse.success("Moment updated successfully", updatedMoment));
+        } catch (MomentNotFoundException e) {
+            log.error("Moment not found", e);
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (UnauthorizedAccessException e) {
+            log.error("Unauthorized access", e);
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (InvalidVisibilityException e) {
+            log.error("Invalid visibility", e);
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error updating moment", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to update moment: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Save moment
+     * POST /api/moments/{id}/save
+     */
+    @PostMapping("/{id}/save")
+    public ResponseEntity<ApiResponse<Void>> saveMoment(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Saving moment: {} by user: {}", id, userId);
+
+        try {
+            momentService.saveMoment(id, userId);
+            return ResponseEntity.ok(ApiResponse.success("Moment saved successfully", null));
+        } catch (MomentNotFoundException e) {
+            log.error("Moment not found", e);
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (UnauthorizedAccessException e) {
+            log.error("Unauthorized access", e);
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error saving moment", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to save moment: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Unsave moment
+     * DELETE /api/moments/{id}/save
+     */
+    @DeleteMapping("/{id}/save")
+    public ResponseEntity<ApiResponse<Void>> unsaveMoment(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Unsaving moment: {} by user: {}", id, userId);
+
+        try {
+            momentService.unsaveMoment(id, userId);
+            return ResponseEntity.ok(ApiResponse.success("Moment unsaved successfully", null));
+        } catch (Exception e) {
+            log.error("Error unsaving moment", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to unsave moment: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Lấy saved moments của current user
+     * GET /api/moments/saved?page=0&size=20
+     */
+    @GetMapping("/saved")
+    public ResponseEntity<ApiResponse<Slice<MomentResponseDTO>>> getSavedMoments(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Getting saved moments for user: {}, page: {}, size: {}", userId, page, size);
+
+        try {
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            Slice<MomentResponseDTO> response = momentService.getSavedMoments(userId, pageable);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (Exception e) {
+            log.error("Error getting saved moments", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to get saved moments: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Get moments created by current user
+     * GET /api/moments/user?page=0&size=20
+     */
+    @GetMapping("/user")
+    public ResponseEntity<ApiResponse<Slice<MomentResponseDTO>>> getUserMoments(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Getting user moments for user: {}, page: {}, size: {}", userId, page, size);
+
+        try {
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            var response = momentService.getUserMoments(userId, pageable);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (Exception e) {
+            log.error("Error getting user moments", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to get user moments: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Get reactions made by current user
+     * GET /api/moments/user/reactions?page=0&size=20
+     */
+    @GetMapping("/user/reactions")
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<Map<String, Object>>>> getUserReactions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Getting user reactions for user: {}, page: {}, size: {}", userId, page, size);
+
+        try {
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            var response = momentService.getUserReactions(userId, pageable);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (Exception e) {
+            log.error("Error getting user reactions", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to get user reactions: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Comment vào moment - gửi comment và ảnh moment vào chat
+     * POST /api/moments/{momentId}/comment
+     */
+    @PostMapping("/{momentId}/comment")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> commentOnMoment(
+            @PathVariable Long momentId,
+            @RequestBody CommentMomentRequest request,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("User {} commenting on moment {}: {}", userId, momentId, request.getComment());
+
+        try {
+            // Gửi comment dưới dạng message
+            var message = messageService.sendCommentAsMessage(userId, momentId, request.getComment());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("messageId", message.getId());
+            response.put("conversationId", message.getConversation().getId());
+            response.put("comment", message.getContent());
+            response.put("momentId", message.getRepliedMoment().getId());
+            response.put("momentImagePath", message.getRepliedMoment().getImagePath());
+            response.put("createdAt", message.getCreatedAt());
+
+            return ResponseEntity.ok(ApiResponse.success("Comment sent successfully", response));
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid request", e);
+            return ResponseEntity
+                    .badRequest()
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            log.error("Cannot comment", e);
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error commenting on moment", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to comment on moment: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Lấy danh sách moments gần đây từ bạn bè cho notifications
+     * GET /api/moments/notifications/recent?limit=10
+     */
+    @GetMapping("/notifications/recent")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getRecentFriendMomentsForNotifications(
+            @RequestParam(defaultValue = "10") int limit,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Getting recent friend moments for notifications, user: {}, limit: {}", userId, limit);
+
+        try {
+            List<Map<String, Object>> response = momentService.getRecentFriendMomentsForNotifications(userId, limit);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (Exception e) {
+            log.error("Error getting recent friend moments for notifications", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to get recent friend moments: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Dismiss a notification
+     * PATCH /api/moments/notifications/{notificationId}/dismiss
+     */
+    @PatchMapping("/notifications/{notificationId}/dismiss")
+    public ResponseEntity<ApiResponse<Void>> dismissNotification(
+            @PathVariable Long notificationId,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Dismissing notification: {} for user: {}", notificationId, userId);
+
+        try {
+            momentService.dismissNotification(notificationId, userId);
+            return ResponseEntity.ok(ApiResponse.success("Notification dismissed successfully", null));
+        } catch (UnauthorizedAccessException e) {
+            log.error("Unauthorized access", e);
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error dismissing notification", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to dismiss notification: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Delete a notification (hard delete)
+     * DELETE /api/moments/notifications/{notificationId}
+     */
+    @DeleteMapping("/notifications/{notificationId}")
+    public ResponseEntity<ApiResponse<Void>> deleteNotification(
+            @PathVariable Long notificationId,
+            @AuthenticationPrincipal User currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : 1L;
+        log.info("Deleting notification: {} for user: {}", notificationId, userId);
+
+        try {
+            momentService.deleteNotification(notificationId, userId);
+            return ResponseEntity.ok(ApiResponse.success("Notification deleted successfully", null));
+        } catch (UnauthorizedAccessException e) {
+            log.error("Unauthorized access", e);
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error deleting notification", e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to delete notification: " + e.getMessage()));
+        }
+    }
+}
