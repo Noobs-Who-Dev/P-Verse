@@ -8,7 +8,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
-
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
@@ -18,6 +17,4 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     @Query("SELECT n FROM Notification n WHERE n.recipient.id = :recipientId AND n.isRead = false ORDER BY n.createdAt DESC")
     List<Notification> findUnreadByRecipientId(@Param("recipientId") Long recipientId);
-
-    Optional<Notification> findByReferenceIdAndSenderId(Long referenceId, Long senderId);
 }
